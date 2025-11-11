@@ -235,26 +235,41 @@ pub fn handle_method_with_config<T: crate::tools::ToolRegistry>(
                         error = %e,
                         "Tool execution error"
                     );
+                    // MCP requires result to always be present, even for errors
+                    // Return error information in the result content
                     Ok(JsonRpcResponse {
                         jsonrpc: constants::JSON_RPC_VERSION.to_string(),
                         id,
-                        result: None,
-                        error: Some(JsonRpcError::from(e)),
+                        result: Some(serde_json::json!({
+                            "content": [
+                                {
+                                    "type": "text",
+                                    "text": format!("Error: {}", e.message)
+                                }
+                            ],
+                            "isError": true
+                        })),
+                        error: None,
                     })
                 }
             }
         }
         _ => {
             error!(method = %method, "Method not found");
+            // MCP requires result to always be present, even for errors
             Ok(JsonRpcResponse {
                 jsonrpc: constants::JSON_RPC_VERSION.to_string(),
                 id,
-                result: None,
-                error: Some(JsonRpcError {
-                    code: constants::error_codes::METHOD_NOT_FOUND,
-                    message: format!("Method not found: {}", method),
-                    data: None,
-                }),
+                result: Some(serde_json::json!({
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": format!("Method not found: {}", method)
+                        }
+                    ],
+                    "isError": true
+                })),
+                error: None,
             })
         }
     }
