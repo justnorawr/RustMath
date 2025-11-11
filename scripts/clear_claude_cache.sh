@@ -46,6 +46,10 @@ echo "  • Session storage"
 echo "  • Local storage"
 echo "  • GPU cache"
 echo "  • Code cache"
+echo "  • IndexedDB"
+echo "  • Cookies"
+echo "  • Web storage"
+echo "  • Service workers"
 echo "  • Log files"
 echo ""
 echo -e "${YELLOW}Note: Your configuration (claude_desktop_config.json) will NOT be deleted.${NC}"
@@ -65,6 +69,10 @@ CODE_CACHE_DIR="$HOME/Library/Application Support/Claude/Code Cache"
 GPU_CACHE_DIR="$HOME/Library/Application Support/Claude/GPUCache"
 APP_CACHE_DIR="$HOME/Library/Caches/com.anthropic.claudefordesktop"
 LOGS_DIR="$HOME/Library/Logs/Claude"
+INDEXED_DB_DIR="$HOME/Library/Application Support/Claude/IndexedDB"
+COOKIES_DIR="$HOME/Library/Application Support/Claude/Cookies"
+SERVICE_WORKER_DIR="$HOME/Library/Application Support/Claude/Service Worker"
+WEB_STORAGE_DIR="$HOME/Library/Application Support/Claude/WebStorage"
 
 cleared_count=0
 
@@ -108,6 +116,30 @@ if [ -d "$APP_CACHE_DIR" ]; then
     ((cleared_count++))
 fi
 
+if [ -d "$INDEXED_DB_DIR" ]; then
+    rm -rf "$INDEXED_DB_DIR"/*
+    echo "  ✓ Cleared: IndexedDB"
+    ((cleared_count++))
+fi
+
+if [ -d "$COOKIES_DIR" ]; then
+    rm -rf "$COOKIES_DIR"/*
+    echo "  ✓ Cleared: Cookies"
+    ((cleared_count++))
+fi
+
+if [ -d "$SERVICE_WORKER_DIR" ]; then
+    rm -rf "$SERVICE_WORKER_DIR"/*
+    echo "  ✓ Cleared: Service Worker"
+    ((cleared_count++))
+fi
+
+if [ -d "$WEB_STORAGE_DIR" ]; then
+    rm -rf "$WEB_STORAGE_DIR"/*
+    echo "  ✓ Cleared: Web Storage"
+    ((cleared_count++))
+fi
+
 # Clear logs
 echo ""
 echo "Clearing log files..."
@@ -128,4 +160,10 @@ echo "Next steps:"
 echo "  1. Restart Claude Desktop"
 echo "  2. Error dialogs should no longer appear"
 echo "  3. MCP servers will reinitialize cleanly"
+echo ""
+echo -e "${YELLOW}Note:${NC} If error dialogs persist after clearing cache:"
+echo "  - The MCP server may be working correctly despite the error"
+echo "  - Try using the tools - they should work even if error shows"
+echo "  - Error dialog may show accumulated errors from ALL previous attempts"
+echo "  - Consider dismissing the dialog and testing functionality"
 echo ""
