@@ -99,73 +99,62 @@ pub fn parse_message<R: BufRead>(reader: &mut R) -> McpResult<ParseResult> {
         })
     } else if starts_with_json {
         // It's raw JSON (Claude Desktop format) - read the entire JSON object
-        // Read all available data in the buffer first
-        let mut json_buffer = Vec::new();
-        
         // Read the initial buffer (already peeked)
+        let mut json_buffer = Vec::new();
         let initial_len = buffer.len();
         json_buffer.extend_from_slice(buffer);
         reader.consume(initial_len);
         
-        // Try to parse immediately - JSON might be complete in first read
-        match serde_json::from_slice::<JsonRpcRequest>(&json_buffer) {
-            Ok(request) => {
-                request.validate()?;
-                return Ok(ParseResult {
-                    request,
-                    uses_content_length: false,
-                });
-            }
-            Err(e) if e.is_eof() || e.is_data() => {
-                // Need more data - try reading more, but don't block indefinitely
-                // Read up to a reasonable limit (10MB) to prevent DoS
-                const MAX_JSON_SIZE: usize = 10_000_000;
-                let mut total_read = json_buffer.len();
-                
-                // Try to read more data, but limit iterations to prevent infinite loops
-                for _ in 0..100 {
-                    let buffer = reader.fill_buf()
+        // Try to parse immediately - JSON is likely complete in first read
+        // If not, we'll read more, but limit to prevent blocking
+        const MAX_JSON_SIZE: usize = 10_000_000;
+        let mut total_read = json_buffer.len();
+        let mut parse_attempts = 0;
+        const MAX_PARSE_ATTEMPTS: usize = 10; // Limit read attempts to prevent blocking
+        
+        loop {
+            // Try parsing what we have
+            match serde_json::from_slice::<JsonRpcRequest>(&json_buffer) {
+                Ok(request) => {
+                    request.validate()?;
+                    return Ok(ParseResult {
+                        request,
+                        uses_content_length: false,
+                    });
+                }
+                Err(e) if e.is_eof() || e.is_data() => {
+                    // Need more data, but only try a few times to avoid blocking
+                    if parse_attempts >= MAX_PARSE_ATTEMPTS {
+                        // We've tried enough - parse what we have as string (might be complete)
+                        break;
+                    }
+                    parse_attempts += 1;
+                    
+                    // Try to read more data
+                    let more_buffer = reader.fill_buf()
                         .map_err(|e| McpError::internal_error(format!("Failed to read JSON: {}", e)))?;
                     
-                    if buffer.is_empty() {
-                        // No more data available - try parsing what we have
+                    if more_buffer.is_empty() {
+                        // No more data - try parsing what we have
                         break;
                     }
                     
-                    if total_read + buffer.len() > MAX_JSON_SIZE {
+                    if total_read + more_buffer.len() > MAX_JSON_SIZE {
                         return Err(McpError::resource_limit(format!(
                             "JSON message exceeds maximum size of {} bytes",
                             MAX_JSON_SIZE
                         )));
                     }
                     
-                    let consumed = buffer.len();
-                    json_buffer.extend_from_slice(buffer);
+                    let consumed = more_buffer.len();
+                    json_buffer.extend_from_slice(more_buffer);
                     reader.consume(consumed);
                     total_read += consumed;
-                    
-                    // Try parsing again after reading more
-                    match serde_json::from_slice::<JsonRpcRequest>(&json_buffer) {
-                        Ok(request) => {
-                            request.validate()?;
-                            return Ok(ParseResult {
-                                request,
-                                uses_content_length: false,
-                            });
-                        }
-                        Err(e2) if e2.is_eof() || e2.is_data() => {
-                            // Still need more - continue
-                            continue;
-                        }
-                        Err(_) => {
-                            // Real parse error - try as string with trimming
-                            break;
-                        }
-                    }
                 }
-            }
-            Err(_) => {
-                // Real parse error - will try as string below
+                Err(_) => {
+                    // Real parse error - try as string with trimming
+                    break;
+                }
             }
         }
         
