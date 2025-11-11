@@ -37,9 +37,15 @@ impl JsonRpcRequest {
 }
 
 /// JSON-RPC response structure
+/// 
+/// Note: For request responses, `id` must match the request ID.
+/// For notifications (requests without ID), `id` should be None.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct JsonRpcResponse {
     pub jsonrpc: String,
+    /// Request ID - must be present for request responses (not null)
+    /// Can be None only for parse errors or notifications
+    /// Note: Claude Desktop requires id to be present (not null) for request responses
     pub id: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub result: Option<Value>,
@@ -144,9 +150,10 @@ pub fn handle_initialize(params: InitializeParams, config: &Config) -> McpResult
         },
     };
 
+    // Note: id will be set by caller (handle_method_with_config)
     Ok(JsonRpcResponse {
         jsonrpc: constants::JSON_RPC_VERSION.to_string(),
-        id: None,
+        id: None, // Will be set by caller from request
         result: Some(serde_json::to_value(result)?),
         error: None,
     })
