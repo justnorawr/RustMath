@@ -37,14 +37,20 @@ fn main() -> McpResult<()> {
     loop {
         match parse_message(&mut reader) {
             Ok(request) => {
+                // Log request ID for debugging
+                info!("Received request: method={}, id={:?}", request.method, request.id);
+                
                 let registry = DefaultToolRegistry;
                 let response = handle_method_with_config(
                     &request.method,
                     request.params,
-                    request.id,
+                    request.id.clone(),
                     &registry,
                     Arc::clone(&config),
                 )?;
+                
+                // Log response ID for debugging
+                info!("Sending response: id={:?}", response.id);
                 send_response(response)?;
             }
             Err(e) => {

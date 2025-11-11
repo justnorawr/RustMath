@@ -114,10 +114,20 @@ pub struct ToolCallParams {
 /// * `response` - The JSON-RPC response to send
 #[instrument(skip(response))]
 pub fn send_response(response: JsonRpcResponse) -> McpResult<()> {
+    // Validate response format for Claude Desktop compatibility
+    // Claude Desktop requires id to be non-null for request responses
+    // (null is only acceptable for parse errors per JSON-RPC 2.0 spec)
+    if response.id.is_none() && response.error.is_none() {
+        // This is a request response without an ID - log warning but allow it
+        // (might be a notification response, which shouldn't happen per spec)
+        debug!("Warning: Response without ID (might be notification response)");
+    }
+    
     let json = serde_json::to_string(&response)?;
     let content_length = json.len();
     
-    debug!("Sending response: {} bytes", content_length);
+    debug!("Sending response: {} bytes, id={:?}", content_length, response.id);
+    debug!("Response JSON: {}", json);
     
     println!("Content-Length: {}\r\n\r\n{}", content_length, json);
     io::stdout().flush()?;
@@ -190,17 +200,19 @@ pub fn handle_method_with_config<T: crate::tools::ToolRegistry>(
                 params.ok_or_else(|| McpError::invalid_params("Missing params"))?,
             )?;
             let mut response = handle_initialize(init_params, &config)?;
-            response.id = id;
+            // Ensure ID is preserved from request - Claude Desktop requires non-null ID
+            response.id = id.clone();
+            debug!("Initialize response id: {:?}", response.id);
             Ok(response)
         }
         constants::methods::TOOLS_LIST => {
-            debug!("Listing tools");
+            debug!("Listing tools, id: {:?}", id);
             let result = serde_json::json!({
                 "tools": registry.get_all_tools()
             });
             Ok(JsonRpcResponse {
                 jsonrpc: constants::JSON_RPC_VERSION.to_string(),
-                id,
+                id: id.clone(),
                 result: Some(result),
                 error: None,
             })
@@ -216,19 +228,22 @@ pub fn handle_method_with_config<T: crate::tools::ToolRegistry>(
             );
 
             match registry.execute_tool(&call_params.name, &call_params.arguments) {
-                Ok(result) => Ok(JsonRpcResponse {
-                    jsonrpc: constants::JSON_RPC_VERSION.to_string(),
-                    id,
-                    result: Some(serde_json::json!({
-                        "content": [
-                            {
-                                "type": "text",
-                                "text": serde_json::to_string(&result)?
-                            }
-                        ]
-                    })),
-                    error: None,
-                }),
+                Ok(result) => {
+                    debug!("Tool execution success, id: {:?}", id);
+                    Ok(JsonRpcResponse {
+                        jsonrpc: constants::JSON_RPC_VERSION.to_string(),
+                        id: id.clone(),
+                        result: Some(serde_json::json!({
+                            "content": [
+                                {
+                                    "type": "text",
+                                    "text": serde_json::to_string(&result)?
+                                }
+                            ]
+                        })),
+                        error: None,
+                    })
+                },
                 Err(e) => {
                     error!(
                         tool_name = %call_params.name,
@@ -237,9 +252,10 @@ pub fn handle_method_with_config<T: crate::tools::ToolRegistry>(
                     );
                     // MCP requires result to always be present, even for errors
                     // Return error information in the result content
+                    debug!("Tool execution error, id: {:?}", id);
                     Ok(JsonRpcResponse {
                         jsonrpc: constants::JSON_RPC_VERSION.to_string(),
-                        id,
+                        id: id.clone(),
                         result: Some(serde_json::json!({
                             "content": [
                                 {
@@ -256,10 +272,11 @@ pub fn handle_method_with_config<T: crate::tools::ToolRegistry>(
         }
         _ => {
             error!(method = %method, "Method not found");
+            debug!("Method not found, id: {:?}", id);
             // MCP requires result to always be present, even for errors
             Ok(JsonRpcResponse {
                 jsonrpc: constants::JSON_RPC_VERSION.to_string(),
-                id,
+                id: id.clone(),
                 result: Some(serde_json::json!({
                     "content": [
                         {
