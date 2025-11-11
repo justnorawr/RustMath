@@ -69,35 +69,14 @@ fn main() -> McpResult<()> {
                     debug!("Received EOF, shutting down gracefully");
                     return Ok(()); // Exit cleanly
                 }
-                
-                error!("Error parsing message: {}", e);
-                // For parse errors, JSON-RPC 2.0 spec says we can send a response with null ID
-                // However, if the parse completely fails, we might not be able to send a proper response
-                // Try to send an error response, but if it fails, just log and continue
-                // Claude Desktop might not accept responses with null ID, so we'll try anyway
-                // For parse errors, default to raw JSON format (Claude Desktop format)
-                match send_response(rust_math_mcp::protocol::JsonRpcResponse {
-                    jsonrpc: rust_math_mcp::protocol::constants::JSON_RPC_VERSION.to_string(),
-                    id: None, // Parse errors can have null ID per JSON-RPC 2.0
-                    result: Some(serde_json::json!({
-                        "content": [
-                            {
-                                "type": "text",
-                                "text": format!("Parse error: {}", e.message)
-                            }
-                        ],
-                        "isError": true
-                    })),
-                    error: None, // Don't use error field - Claude Desktop doesn't recognize it
-                }, false) { // Use raw JSON format for parse errors (Claude Desktop format)
-                    Ok(_) => {
-                        // Response sent successfully
-                    }
-                    Err(send_err) => {
-                        error!("Failed to send error response: {}", send_err);
-                        // Don't exit - continue processing
-                    }
-                }
+
+                // For parse errors, we cannot send a valid response because:
+                // 1. JSON-RPC 2.0 spec allows null ID for parse errors
+                // 2. Claude Desktop's validation REJECTS responses with null ID
+                // 3. We don't have a valid request ID from a failed parse
+                // Solution: Log the error and continue waiting for next valid message
+                error!("Parse error (cannot respond to client): {}", e);
+                // Continue loop to process next message
             }
         }
     }

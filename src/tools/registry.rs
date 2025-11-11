@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use super::{
-    advanced, algebra, basic_math, combinatorics, equations, finance, geometry, statistics,
+    advanced, algebra, basic_math, batch, combinatorics, equations, finance, geometry, statistics,
     trigonometry,
 };
 
@@ -30,6 +30,9 @@ static TOOL_REGISTRY: Lazy<HashMap<&'static str, ToolExecutor>> = Lazy::new(|| {
     registry.insert(basic_math::TOOL_CEIL, basic_math::execute as ToolExecutor);
     registry.insert(basic_math::TOOL_MODULO, basic_math::execute as ToolExecutor);
 
+    // Register batch operations tool
+    registry.insert(batch::TOOL_BATCH, batch::execute as ToolExecutor);
+
     // Register other tool categories (they still use the old approach temporarily)
     register_tools_legacy(&mut registry, algebra::get_tool_definitions(), algebra::execute);
     register_tools_legacy(&mut registry, statistics::get_tool_definitions(), statistics::execute);
@@ -48,6 +51,7 @@ static TOOL_DEFINITIONS: Lazy<Arc<Value>> = Lazy::new(|| {
     let mut all_tools = Vec::new();
 
     all_tools.extend(basic_math::get_tool_definitions());
+    all_tools.extend(batch::get_tool_definitions());
     all_tools.extend(algebra::get_tool_definitions());
     all_tools.extend(statistics::get_tool_definitions());
     all_tools.extend(geometry::get_tool_definitions());

@@ -172,9 +172,9 @@ pub fn parse_message<R: BufRead>(reader: &mut R) -> McpResult<ParseResult> {
             .map_err(|e| McpError::internal_error(format!("Failed to read input: {}", e)))?;
         let trimmed = first_line.trim();
         debug!("Unknown input format, first line: {:?}", trimmed);
-        return Err(McpError::invalid_request(format!(
+        Err(McpError::invalid_request(format!(
             "Unknown message format, expected Content-Length header or JSON, got: {}",
             if trimmed.len() > 50 { format!("{}...", &trimmed[..50]) } else { trimmed.to_string() }
-        )));
+        )))
     }
 }

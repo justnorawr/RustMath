@@ -188,14 +188,14 @@ fn tan(angle: f64) -> McpResult<f64> {
 }
 
 fn asin(value: f64) -> McpResult<f64> {
-    if value < -1.0 || value > 1.0 {
+    if !(-1.0..=1.0).contains(&value) {
         return Err(crate::error::McpError::validation_error("Value must be between -1 and 1 for arcsine"));
     }
     Ok(value.asin())
 }
 
 fn acos(value: f64) -> McpResult<f64> {
-    if value < -1.0 || value > 1.0 {
+    if !(-1.0..=1.0).contains(&value) {
         return Err(crate::error::McpError::validation_error("Value must be between -1 and 1 for arccosine"));
     }
     Ok(value.acos())

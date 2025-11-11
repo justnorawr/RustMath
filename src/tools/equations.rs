@@ -152,14 +152,12 @@ fn pythagorean_theorem(a: f64, b: f64, c: Option<f64>) -> McpResult<f64> {
     if let Some(c_val) = c {
         if c_val == 0.0 {
             Ok((a * a + b * b).sqrt())
+        } else if a == 0.0 {
+            Ok((c_val * c_val - b * b).sqrt())
+        } else if b == 0.0 {
+            Ok((c_val * c_val - a * a).sqrt())
         } else {
-            if a == 0.0 {
-                Ok((c_val * c_val - b * b).sqrt())
-            } else if b == 0.0 {
-                Ok((c_val * c_val - a * a).sqrt())
-            } else {
-                Err(crate::error::McpError::validation_error("Cannot determine which side to calculate"))
-            }
+            Err(crate::error::McpError::validation_error("Cannot determine which side to calculate"))
         }
     } else {
         Ok((a * a + b * b).sqrt())

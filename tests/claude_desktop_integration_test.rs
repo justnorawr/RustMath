@@ -69,7 +69,7 @@ impl McpServerProcess {
             .expect("Failed to read response");
 
         let trimmed = response_line.trim();
-        serde_json::from_str(trimmed).expect(&format!("Failed to parse response: {}", trimmed))
+        serde_json::from_str(trimmed).unwrap_or_else(|_| panic!("Failed to parse response: {}", trimmed))
     }
 
 
@@ -484,6 +484,271 @@ fn test_statistics_tools() {
     let text = content[0]["text"].as_str().unwrap();
     let result_data: Value = serde_json::from_str(text).unwrap();
     assert_eq!(result_data["result"], 3.0);
+
+    server.terminate();
+}
+
+#[test]
+fn test_batch_operations_single_call() {
+    let mut server = McpServerProcess::spawn();
+
+    // Initialize
+    server.send_request(
+        "initialize",
+        json!({
+            "protocolVersion": "2025-06-18",
+            "capabilities": {},
+            "clientInfo": {"name": "test", "version": "1.0"}
+        }),
+        0,
+    );
+    let _ = server.read_response();
+
+    // Execute multiple operations in a single batch call
+    server.send_request(
+        "tools/call",
+        json!({
+            "name": "batch_operations",
+            "arguments": {
+                "operations": [
+                    {
+                        "id": "calc1",
+                        "tool": "add",
+                        "arguments": {"numbers": [10.0, 20.0, 30.0]}
+                    },
+                    {
+                        "id": "calc2",
+                        "tool": "multiply",
+                        "arguments": {"numbers": [5.0, 6.0]}
+                    },
+                    {
+                        "id": "calc3",
+                        "tool": "mean",
+                        "arguments": {"numbers": [100.0, 200.0, 300.0]}
+                    },
+                    {
+                        "id": "calc4",
+                        "tool": "sqrt",
+                        "arguments": {"number": 144.0}
+                    }
+                ]
+            }
+        }),
+        1,
+    );
+
+    let response = server.read_response();
+
+    // Verify response
+    assert_eq!(response["jsonrpc"], "2.0");
+    assert_eq!(response["id"], 1);
+    assert!(response["result"].is_object());
+
+    // Parse the batch result
+    let content = &response["result"]["content"];
+    let text = content[0]["text"].as_str().unwrap();
+    let batch_result: Value = serde_json::from_str(text).unwrap();
+
+    // Verify summary
+    assert_eq!(batch_result["summary"]["total"], 4);
+    assert_eq!(batch_result["summary"]["successful"], 4);
+    assert_eq!(batch_result["summary"]["failed"], 0);
+
+    // Verify individual results
+    let results = batch_result["results"].as_array().unwrap();
+
+    let calc1 = results.iter().find(|r| r["id"] == "calc1").unwrap();
+    assert_eq!(calc1["success"], true);
+    assert_eq!(calc1["result"]["result"], 60.0);
+
+    let calc2 = results.iter().find(|r| r["id"] == "calc2").unwrap();
+    assert_eq!(calc2["success"], true);
+    assert_eq!(calc2["result"]["result"], 30.0);
+
+    let calc3 = results.iter().find(|r| r["id"] == "calc3").unwrap();
+    assert_eq!(calc3["success"], true);
+    assert_eq!(calc3["result"]["result"], 200.0);
+
+    let calc4 = results.iter().find(|r| r["id"] == "calc4").unwrap();
+    assert_eq!(calc4["success"], true);
+    assert_eq!(calc4["result"]["result"], 12.0);
+
+    server.terminate();
+}
+
+#[test]
+fn test_batch_operations_with_errors() {
+    let mut server = McpServerProcess::spawn();
+
+    // Initialize
+    server.send_request(
+        "initialize",
+        json!({
+            "protocolVersion": "2025-06-18",
+            "capabilities": {},
+            "clientInfo": {"name": "test", "version": "1.0"}
+        }),
+        0,
+    );
+    let _ = server.read_response();
+
+    // Execute batch with some failing operations
+    server.send_request(
+        "tools/call",
+        json!({
+            "name": "batch_operations",
+            "arguments": {
+                "operations": [
+                    {
+                        "id": "good1",
+                        "tool": "add",
+                        "arguments": {"numbers": [1.0, 2.0, 3.0]}
+                    },
+                    {
+                        "id": "bad1",
+                        "tool": "divide",
+                        "arguments": {"a": 10.0, "b": 0.0}  // Division by zero
+                    },
+                    {
+                        "id": "bad2",
+                        "tool": "nonexistent_tool",
+                        "arguments": {}
+                    },
+                    {
+                        "id": "good2",
+                        "tool": "multiply",
+                        "arguments": {"numbers": [7.0, 8.0]}
+                    }
+                ]
+            }
+        }),
+        1,
+    );
+
+    let response = server.read_response();
+
+    // Parse the batch result
+    let content = &response["result"]["content"];
+    let text = content[0]["text"].as_str().unwrap();
+    let batch_result: Value = serde_json::from_str(text).unwrap();
+
+    // Verify summary shows mixed results
+    assert_eq!(batch_result["summary"]["total"], 4);
+    assert_eq!(batch_result["summary"]["successful"], 2);
+    assert_eq!(batch_result["summary"]["failed"], 2);
+
+    let results = batch_result["results"].as_array().unwrap();
+
+    // Check successful operations
+    let good1 = results.iter().find(|r| r["id"] == "good1").unwrap();
+    assert_eq!(good1["success"], true);
+    assert_eq!(good1["result"]["result"], 6.0);
+
+    let good2 = results.iter().find(|r| r["id"] == "good2").unwrap();
+    assert_eq!(good2["success"], true);
+    assert_eq!(good2["result"]["result"], 56.0);
+
+    // Check failed operations
+    let bad1 = results.iter().find(|r| r["id"] == "bad1").unwrap();
+    assert_eq!(bad1["success"], false);
+    assert!(bad1["error"].is_string());
+
+    let bad2 = results.iter().find(|r| r["id"] == "bad2").unwrap();
+    assert_eq!(bad2["success"], false);
+    assert!(bad2["error"].as_str().unwrap().contains("Unknown tool"));
+
+    server.terminate();
+}
+
+#[test]
+fn test_batch_operations_complex_workflow() {
+    let mut server = McpServerProcess::spawn();
+
+    // Initialize
+    server.send_request(
+        "initialize",
+        json!({
+            "protocolVersion": "2025-06-18",
+            "capabilities": {},
+            "clientInfo": {"name": "test", "version": "1.0"}
+        }),
+        0,
+    );
+    let _ = server.read_response();
+
+    // Simulate a complex data analysis workflow in a single call
+    server.send_request(
+        "tools/call",
+        json!({
+            "name": "batch_operations",
+            "arguments": {
+                "operations": [
+                    {
+                        "id": "data_sum",
+                        "tool": "add",
+                        "arguments": {"numbers": [45.0, 67.0, 89.0, 23.0, 56.0]}
+                    },
+                    {
+                        "id": "data_mean",
+                        "tool": "mean",
+                        "arguments": {"numbers": [45.0, 67.0, 89.0, 23.0, 56.0]}
+                    },
+                    {
+                        "id": "data_median",
+                        "tool": "median",
+                        "arguments": {"numbers": [45.0, 67.0, 89.0, 23.0, 56.0]}
+                    },
+                    {
+                        "id": "data_stddev",
+                        "tool": "std_dev",
+                        "arguments": {"numbers": [45.0, 67.0, 89.0, 23.0, 56.0]}
+                    },
+                    {
+                        "id": "geometry1",
+                        "tool": "area_circle",
+                        "arguments": {"radius": 10.0}
+                    },
+                    {
+                        "id": "geometry2",
+                        "tool": "area_rectangle",
+                        "arguments": {"length": 15.0, "width": 8.0}
+                    },
+                    {
+                        "id": "finance1",
+                        "tool": "compound_interest",
+                        "arguments": {
+                            "principal": 1000.0,
+                            "rate": 5.0,
+                            "time": 10.0,
+                            "n": 12.0
+                        }
+                    }
+                ]
+            }
+        }),
+        1,
+    );
+
+    let response = server.read_response();
+
+    // Parse the batch result
+    let content = &response["result"]["content"];
+    let text = content[0]["text"].as_str().unwrap();
+    let batch_result: Value = serde_json::from_str(text).unwrap();
+
+    // All operations should succeed
+    assert_eq!(batch_result["summary"]["total"], 7);
+    assert_eq!(batch_result["summary"]["successful"], 7);
+    assert_eq!(batch_result["summary"]["failed"], 0);
+
+    let results = batch_result["results"].as_array().unwrap();
+    assert_eq!(results.len(), 7);
+
+    // Verify all have results
+    for result in results {
+        assert_eq!(result["success"], true);
+        assert!(result["result"].is_object());
+    }
 
     server.terminate();
 }

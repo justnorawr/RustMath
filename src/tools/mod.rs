@@ -1,6 +1,7 @@
 pub mod advanced;
 pub mod algebra;
 pub mod basic_math;
+pub mod batch;
 pub mod combinatorics;
 pub mod equations;
 pub mod finance;

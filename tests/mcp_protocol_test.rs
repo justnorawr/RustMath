@@ -1,4 +1,4 @@
-use rust_math_mcp::protocol::{JsonRpcRequest, JsonRpcResponse};
+use rust_math_mcp::protocol::JsonRpcRequest;
 use serde_json::{json, Value};
 
 #[test]
