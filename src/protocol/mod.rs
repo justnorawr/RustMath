@@ -82,16 +82,20 @@ pub struct ServerInfo {
 /// Initialize parameters
 #[derive(Debug, Serialize, Deserialize)]
 pub struct InitializeParams {
+    #[serde(rename = "protocolVersion")]
     pub protocol_version: String,
     pub capabilities: Value,
+    #[serde(rename = "clientInfo")]
     pub client_info: Value,
 }
 
 /// Initialize result
 #[derive(Debug, Serialize, Deserialize)]
 pub struct InitializeResult {
+    #[serde(rename = "protocolVersion")]
     pub protocol_version: String,
     pub capabilities: Value,
+    #[serde(rename = "serverInfo")]
     pub server_info: ServerInfo,
 }
 
