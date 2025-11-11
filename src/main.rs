@@ -12,20 +12,25 @@ use tracing::{error, info};
 
 fn main() -> McpResult<()> {
     // Configure tracing to write to stderr to avoid polluting stdout (MCP protocol)
+    // MCP uses stdout for protocol communication, so ALL output must go to stderr
     tracing_subscriber::fmt()
-        .with_writer(std::io::stderr)
+        .with_writer(std::io::stderr) // Critical: stderr only, never stdout
         .with_ansi(false) // Disable ANSI codes for compatibility
+        .with_target(false) // Disable target prefix to reduce noise
+        .with_thread_ids(false) // Disable thread IDs to reduce noise
+        .with_thread_names(false) // Disable thread names to reduce noise
         .with_env_filter(
             std::env::var("RUST_LOG")
-                .unwrap_or_else(|_| "rust_math_mcp=info".to_string())
+                .unwrap_or_else(|_| "rust_math_mcp=warn".to_string()) // Default to warn to reduce noise
         )
         .init();
 
-    info!("Starting Rust Math MCP Server");
+    // Log startup to stderr only (tracing is configured to use stderr)
+    debug!("Starting Rust Math MCP Server");
 
     // Create config once at startup
     let config = Arc::new(Config::new());
-    info!(
+    debug!(
         server_name = %config.server_name(),
         server_version = %config.server_version(),
         "Server configuration loaded"
@@ -37,8 +42,8 @@ fn main() -> McpResult<()> {
     loop {
         match parse_message(&mut reader) {
             Ok(request) => {
-                // Log request ID for debugging
-                info!("Received request: method={}, id={:?}", request.method, request.id);
+                // Log to stderr only (tracing is configured to use stderr)
+                debug!("Received request: method={}, id={:?}", request.method, request.id);
                 
                 let registry = DefaultToolRegistry;
                 let response = handle_method_with_config(
@@ -49,8 +54,8 @@ fn main() -> McpResult<()> {
                     Arc::clone(&config),
                 )?;
                 
-                // Log response ID for debugging
-                info!("Sending response: id={:?}", response.id);
+                // Log to stderr only
+                debug!("Sending response: id={:?}", response.id);
                 send_response(response)?;
             }
             Err(e) => {

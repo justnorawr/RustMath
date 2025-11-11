@@ -130,8 +130,10 @@ pub fn send_response(response: JsonRpcResponse) -> McpResult<()> {
     let json = serde_json::to_string(&response)?;
     let content_length = json.len();
     
+    // Log to stderr only (tracing is configured to use stderr)
     debug!("Sending response: {} bytes, id={:?}", content_length, response.id);
-    debug!("Response JSON: {}", json);
+    // Only log full JSON in trace level to avoid stderr spam
+    trace!("Response JSON: {}", json);
     
     // MCP protocol format: Content-Length header, blank line, then JSON
     // Use write! with exact byte control to ensure proper format
