@@ -55,10 +55,11 @@ fn main() -> McpResult<()> {
             }
             Err(e) => {
                 error!("Error parsing message: {}", e);
-                // Note: We can't get request ID from a failed parse, so id remains None
-                // For parse errors, JSON-RPC 2.0 allows null ID, but Claude Desktop might not accept it
-                // Use result field instead of error field to match Claude Desktop requirements
-                let error_response = rust_math_mcp::protocol::JsonRpcResponse {
+                // For parse errors, JSON-RPC 2.0 spec says we can send a response with null ID
+                // However, if the parse completely fails, we might not be able to send a proper response
+                // Try to send an error response, but if it fails, just log and continue
+                // Claude Desktop might not accept responses with null ID, so we'll try anyway
+                match send_response(rust_math_mcp::protocol::JsonRpcResponse {
                     jsonrpc: rust_math_mcp::protocol::constants::JSON_RPC_VERSION.to_string(),
                     id: None, // Parse errors can have null ID per JSON-RPC 2.0
                     result: Some(serde_json::json!({
@@ -71,9 +72,15 @@ fn main() -> McpResult<()> {
                         "isError": true
                     })),
                     error: None, // Don't use error field - Claude Desktop doesn't recognize it
-                };
-                send_response(error_response)?;
-                // Continue processing - don't exit on parse errors
+                }) {
+                    Ok(_) => {
+                        // Response sent successfully
+                    }
+                    Err(send_err) => {
+                        error!("Failed to send error response: {}", send_err);
+                        // Don't exit - continue processing
+                    }
+                }
             }
         }
     }

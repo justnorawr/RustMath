@@ -130,11 +130,15 @@ pub fn send_response(response: JsonRpcResponse) -> McpResult<()> {
     debug!("Response JSON: {}", json);
     
     // MCP protocol format: Content-Length header, blank line, then JSON
-    // Use write! instead of println! for more control and to avoid any extra formatting
-    // Ensure no extra newlines or characters are added
-    write!(io::stdout(), "Content-Length: {}\r\n\r\n{}", content_length, json)
-        .map_err(|e| McpError::internal_error(format!("Failed to write response: {}", e)))?;
-    io::stdout().flush()
+    // Use write! with exact byte control to ensure proper format
+    // Format: "Content-Length: <number>\r\n\r\n<json>"
+    let header = format!("Content-Length: {}\r\n\r\n", content_length);
+    let mut stdout = io::stdout();
+    stdout.write_all(header.as_bytes())
+        .map_err(|e| McpError::internal_error(format!("Failed to write header: {}", e)))?;
+    stdout.write_all(json.as_bytes())
+        .map_err(|e| McpError::internal_error(format!("Failed to write JSON: {}", e)))?;
+    stdout.flush()
         .map_err(|e| McpError::internal_error(format!("Failed to flush stdout: {}", e)))?;
     Ok(())
 }
