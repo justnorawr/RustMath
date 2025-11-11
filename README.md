@@ -88,20 +88,156 @@ This is a production-ready MCP server that provides a comprehensive suite of mat
 - **exponential_growth**: Calculate exponential growth (continuous or discrete)
 - **logarithm**: Calculate logarithms (natural, common, or custom base)
 
-**Total: 53 mathematical tools**
+### Batch Operations (1 tool)
+- **batch_operations**: Execute multiple math operations in a single call
+  - Batch up to 50 operations at once
+  - Each operation has a unique ID for result matching
+  - Operations execute independently (failures don't stop others)
+  - Returns summary with success/failure counts
+
+**Total: 54 mathematical tools**
 
 ## Requirements
 
 - Rust 1.70+ (edition 2021)
 - Cargo
 
-## Building
+## Quick Start with Claude Desktop
+
+### 1. Build the Server
 
 ```bash
 cargo build --release
 ```
 
-## Running
+The binary will be created at `target/release/rust-math-mcp`.
+
+### 2. Configure Claude Desktop
+
+Add the server to your Claude Desktop configuration file:
+
+**macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+**Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
+**Linux**: `~/.config/Claude/claude_desktop_config.json`
+
+```json
+{
+  "mcpServers": {
+    "rust-math": {
+      "command": "/absolute/path/to/rust-math-mcp/target/release/rust-math-mcp"
+    }
+  }
+}
+```
+
+**Important**: Replace `/absolute/path/to/rust-math-mcp` with the actual absolute path to your project directory.
+
+Example:
+```json
+{
+  "mcpServers": {
+    "rust-math": {
+      "command": "/Users/yourname/projects/rust-math-mcp/target/release/rust-math-mcp"
+    }
+  }
+}
+```
+
+### Advanced Configuration
+
+You can customize the server behavior by passing environment variables:
+
+```json
+{
+  "mcpServers": {
+    "rust-math": {
+      "command": "/Users/yourname/projects/rust-math-mcp/target/release/rust-math-mcp",
+      "env": {
+        "RUST_LOG": "rust_math_mcp=debug",
+        "MCP_MAX_REQUESTS_PER_SECOND": "500",
+        "MCP_MAX_ARRAY_SIZE": "5000"
+      }
+    }
+  }
+}
+```
+
+Available environment variables:
+- `RUST_LOG`: Logging level (`error`, `warn`, `info`, `debug`, `trace`)
+- `MCP_MAX_REQUESTS_PER_SECOND`: Rate limit (default: 1000)
+- `MCP_MAX_ARRAY_SIZE`: Max array size for inputs (default: 10000)
+- `MCP_MAX_DECIMAL_PLACES`: Max decimal precision (default: 15)
+- `MCP_ENABLE_RATE_LIMIT`: Enable/disable rate limiting (default: true)
+
+### 3. Restart Claude Desktop
+
+Completely quit Claude Desktop (⌘Q on macOS) and reopen it. The rust-math MCP server will automatically start when Claude Desktop launches.
+
+### 4. Verify Installation
+
+In Claude Desktop, you can verify the server is running by asking:
+> "What math tools do you have available?"
+
+Claude should respond with a list of the 54 available mathematical tools.
+
+## Usage Examples
+
+### Basic Calculations
+
+```
+You: Calculate 15% of 250
+Claude: [Uses percentage tool] → 37.5
+
+You: What's the square root of 144?
+Claude: [Uses sqrt tool] → 12
+
+You: Find the GCD of 48 and 18
+Claude: [Uses gcd tool] → 6
+```
+
+### Statistical Analysis
+
+```
+You: Calculate the mean, median, and standard deviation of [23, 45, 67, 12, 89, 34, 56]
+Claude: [Uses mean, median, std_dev tools]
+- Mean: 46.57
+- Median: 45
+- Standard Deviation: 25.89
+```
+
+### Batch Operations
+
+Perform multiple calculations in a single call for better performance:
+
+```
+You: I need to calculate the following:
+1. Sum of 10, 20, 30
+2. Mean of 100, 200, 300
+3. Square root of 144
+4. Area of a circle with radius 5
+
+Claude: [Uses batch_operations tool]
+Results:
+1. Sum: 60
+2. Mean: 200
+3. Square root: 12
+4. Circle area: 78.54
+```
+
+### Complex Problems
+
+```
+You: Solve the quadratic equation: 2x² - 7x + 3 = 0
+Claude: [Uses quadratic_formula tool]
+The solutions are x = 3 and x = 0.5
+
+You: Calculate compound interest on $10,000 at 5% annual rate for 10 years, compounded monthly
+Claude: [Uses compound_interest tool]
+Final amount: $16,470.09
+Interest earned: $6,470.09
+```
+
+## Running Manually
 
 The MCP server communicates via stdin/stdout using JSON-RPC 2.0:
 
@@ -139,6 +275,38 @@ MCP_MAX_REQUESTS_PER_SECOND=100 cargo run
 ```
 
 Rate limiting uses a token bucket algorithm to prevent DoS attacks while allowing bursts of legitimate traffic.
+
+## Troubleshooting
+
+### Server Not Showing in Claude Desktop
+
+1. **Check configuration file path**: Ensure the config file exists at the correct location for your OS
+2. **Verify binary path**: The `command` must be an absolute path, not relative
+3. **Check binary exists**: Run `ls -la /path/to/rust-math-mcp` to verify the file exists
+4. **Restart Claude Desktop**: Completely quit (⌘Q on macOS) and reopen
+
+### Server Errors in Claude Desktop
+
+Check the logs for detailed error messages:
+- **macOS**: `~/Library/Logs/Claude/mcp-server-rust-math.log`
+- **Windows**: `%APPDATA%\Claude\logs\mcp-server-rust-math.log`
+- **Linux**: `~/.local/state/Claude/logs/mcp-server-rust-math.log`
+
+### Common Issues
+
+**"Server disconnected" or timeout errors**:
+- Make sure you've built the latest version: `cargo build --release`
+- Copy the new binary to your configured location
+- Restart Claude Desktop
+
+**"Command not found"**:
+- Check that the path in your config is absolute (starts with `/` on Unix or `C:\` on Windows)
+- Verify the binary has execute permissions: `chmod +x target/release/rust-math-mcp`
+
+**Tools not appearing**:
+- Wait a few seconds after Claude Desktop starts for the server to initialize
+- Ask Claude "What tools do you have?" to trigger tool discovery
+- Check the logs for initialization errors
 
 ### Security Features
 

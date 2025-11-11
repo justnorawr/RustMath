@@ -24,10 +24,10 @@ use serde_json::Value;
 /// let radius = get_number(&args, "radius").unwrap(); // 5.0
 /// ```
 pub fn get_number(arguments: &Value, key: &str) -> McpResult<f64> {
-    let value = arguments[key]
-        .as_f64()
-        .ok_or_else(|| McpError::invalid_params(format!("Invalid argument: {} must be a number", key)))?;
-    
+    let value = arguments[key].as_f64().ok_or_else(|| {
+        McpError::invalid_params(format!("Invalid argument: {} must be a number", key))
+    })?;
+
     // Validate the number is finite
     if !value.is_finite() {
         return Err(McpError::validation_error(format!(
@@ -35,7 +35,7 @@ pub fn get_number(arguments: &Value, key: &str) -> McpResult<f64> {
             key
         )));
     }
-    
+
     Ok(value)
 }
 
@@ -83,24 +83,24 @@ pub fn get_number_opt(arguments: &Value, key: &str) -> Option<f64> {
 pub fn get_number_array(arguments: &Value, key: &str) -> McpResult<Vec<f64>> {
     use crate::config::Config;
     use crate::utils::validation::validate_array_size;
-    
-    let arr = arguments[key]
-        .as_array()
-        .ok_or_else(|| McpError::invalid_params(format!("Invalid arguments: {} must be an array", key)))?;
-    
+
+    let arr = arguments[key].as_array().ok_or_else(|| {
+        McpError::invalid_params(format!("Invalid arguments: {} must be an array", key))
+    })?;
+
     // Validate array size
     let config = Config::new();
     validate_array_size(arr.len(), &config)?;
-    
-    let numbers: Vec<f64> = arr
-        .iter()
-        .filter_map(|v| v.as_f64())
-        .collect();
-    
+
+    let numbers: Vec<f64> = arr.iter().filter_map(|v| v.as_f64()).collect();
+
     if numbers.len() != arr.len() {
-        return Err(McpError::invalid_params(format!("Invalid arguments: {} must be an array of numbers", key)));
+        return Err(McpError::invalid_params(format!(
+            "Invalid arguments: {} must be an array of numbers",
+            key
+        )));
     }
-    
+
     // Validate all numbers are finite
     for (idx, num) in numbers.iter().enumerate() {
         if !num.is_finite() {
@@ -110,7 +110,7 @@ pub fn get_number_array(arguments: &Value, key: &str) -> McpResult<Vec<f64>> {
             )));
         }
     }
-    
+
     Ok(numbers)
 }
 

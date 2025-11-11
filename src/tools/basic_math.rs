@@ -205,7 +205,10 @@ pub fn execute(name: &str, arguments: &Value) -> McpResult<Value> {
             let b = get_number(arguments, "b")?;
             Ok(result_json(modulo(a, b)?))
         }
-        _ => Err(crate::error::McpError::tool_error(format!("Unknown basic math tool: {}", name))),
+        _ => Err(crate::error::McpError::tool_error(format!(
+            "Unknown basic math tool: {}",
+            name
+        ))),
     }
 }
 
@@ -235,7 +238,9 @@ fn power(base: f64, exponent: f64) -> McpResult<f64> {
 
 fn sqrt(number: f64) -> McpResult<f64> {
     if number < 0.0 {
-        return Err(crate::error::McpError::validation_error("Cannot take square root of negative number"));
+        return Err(crate::error::McpError::validation_error(
+            "Cannot take square root of negative number",
+        ));
     }
     Ok(number.sqrt())
 }
@@ -264,4 +269,3 @@ fn modulo(a: f64, b: f64) -> McpResult<f64> {
     }
     Ok(a % b)
 }
-

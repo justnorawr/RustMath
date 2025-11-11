@@ -14,4 +14,3 @@ pub mod trigonometry;
 // Re-export for convenience
 pub use registry::{execute_tool, get_all_tools, DefaultToolRegistry};
 pub use traits::ToolRegistry;
-

@@ -2,9 +2,9 @@
 // These tests spawn the binary as a subprocess and communicate via stdin/stdout
 // exactly as Claude Desktop does.
 
-use std::io::{BufRead, BufReader, Write};
-use std::process::{Command, Stdio, Child, ChildStdin, ChildStdout};
 use serde_json::{json, Value};
+use std::io::{BufRead, BufReader, Write};
+use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 
 /// Helper struct to manage communication with the MCP server process
 struct McpServerProcess {
@@ -69,9 +69,9 @@ impl McpServerProcess {
             .expect("Failed to read response");
 
         let trimmed = response_line.trim();
-        serde_json::from_str(trimmed).unwrap_or_else(|_| panic!("Failed to parse response: {}", trimmed))
+        serde_json::from_str(trimmed)
+            .unwrap_or_else(|_| panic!("Failed to parse response: {}", trimmed))
     }
-
 
     /// Terminate the server process
     fn terminate(mut self) {
@@ -111,7 +111,10 @@ fn test_initialize_handshake() {
     assert_eq!(response["jsonrpc"], "2.0");
     assert_eq!(response["id"], 0);
     assert!(response["result"].is_object(), "result should be an object");
-    assert!(response.get("error").is_none(), "error field should not be present");
+    assert!(
+        response.get("error").is_none(),
+        "error field should not be present"
+    );
 
     // Verify response content
     let result = &response["result"];
@@ -164,7 +167,10 @@ fn test_tools_list() {
         .collect();
 
     assert!(tool_names.contains(&"add"), "should have add tool");
-    assert!(tool_names.contains(&"multiply"), "should have multiply tool");
+    assert!(
+        tool_names.contains(&"multiply"),
+        "should have multiply tool"
+    );
     assert!(tool_names.contains(&"mean"), "should have mean tool");
 
     server.terminate();
@@ -304,7 +310,10 @@ fn test_tools_call_error_handling() {
     assert_eq!(response["jsonrpc"], "2.0");
     assert_eq!(response["id"], 4);
     assert!(response["result"].is_object());
-    assert!(response.get("error").is_none(), "should use result, not error field");
+    assert!(
+        response.get("error").is_none(),
+        "should use result, not error field"
+    );
 
     // Verify error is in result content
     let result = &response["result"];
@@ -313,7 +322,10 @@ fn test_tools_call_error_handling() {
     let content = &result["content"];
     assert!(content.is_array());
     let text = content[0]["text"].as_str().unwrap();
-    assert!(text.contains("Error"), "error message should contain 'Error'");
+    assert!(
+        text.contains("Error"),
+        "error message should contain 'Error'"
+    );
 
     server.terminate();
 }

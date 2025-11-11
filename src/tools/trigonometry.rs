@@ -1,6 +1,6 @@
 use crate::error::McpResult;
-use serde_json::Value;
 use crate::utils::args::{get_number, get_number_opt, result_json, result_value};
+use serde_json::Value;
 
 pub fn get_tool_definitions() -> Vec<Value> {
     vec![
@@ -161,7 +161,9 @@ pub fn execute(name: &str, arguments: &Value) -> McpResult<Value> {
             let angle_a = get_number(arguments, "angle_a")?;
             let side_b = get_number_opt(arguments, "side_b");
             let angle_b = get_number(arguments, "angle_b")?;
-            Ok(result_value(law_of_sines(side_a, angle_a, side_b, angle_b)?))
+            Ok(result_value(law_of_sines(
+                side_a, angle_a, side_b, angle_b,
+            )?))
         }
         "degrees_to_radians" => {
             let degrees = get_number(arguments, "degrees")?;
@@ -171,7 +173,10 @@ pub fn execute(name: &str, arguments: &Value) -> McpResult<Value> {
             let radians = get_number(arguments, "radians")?;
             Ok(result_json(radians_to_degrees(radians)?))
         }
-        _ => Err(crate::error::McpError::tool_error(format!("Unknown trigonometry tool: {}", name))),
+        _ => Err(crate::error::McpError::tool_error(format!(
+            "Unknown trigonometry tool: {}",
+            name
+        ))),
     }
 }
 
@@ -189,14 +194,18 @@ fn tan(angle: f64) -> McpResult<f64> {
 
 fn asin(value: f64) -> McpResult<f64> {
     if !(-1.0..=1.0).contains(&value) {
-        return Err(crate::error::McpError::validation_error("Value must be between -1 and 1 for arcsine"));
+        return Err(crate::error::McpError::validation_error(
+            "Value must be between -1 and 1 for arcsine",
+        ));
     }
     Ok(value.asin())
 }
 
 fn acos(value: f64) -> McpResult<f64> {
     if !(-1.0..=1.0).contains(&value) {
-        return Err(crate::error::McpError::validation_error("Value must be between -1 and 1 for arccosine"));
+        return Err(crate::error::McpError::validation_error(
+            "Value must be between -1 and 1 for arccosine",
+        ));
     }
     Ok(value.acos())
 }
@@ -212,21 +221,32 @@ fn law_of_cosines(a: f64, b: f64, c: Option<f64>, angle_c: Option<f64>) -> McpRe
                 let c_calc = (a * a + b * b - 2.0 * a * b * angle.cos()).sqrt();
                 Ok(serde_json::json!({ "side_c": c_calc }))
             } else {
-                Err(crate::error::McpError::validation_error("Angle C is required to calculate side c"))
+                Err(crate::error::McpError::validation_error(
+                    "Angle C is required to calculate side c",
+                ))
             }
         } else {
             let cos_c = (a * a + b * b - c_val * c_val) / (2.0 * a * b);
             if cos_c.abs() > 1.0 {
-                return Err(crate::error::McpError::validation_error("Invalid triangle: sides do not satisfy triangle inequality"));
+                return Err(crate::error::McpError::validation_error(
+                    "Invalid triangle: sides do not satisfy triangle inequality",
+                ));
             }
             Ok(serde_json::json!({ "angle_c": cos_c.acos() }))
         }
     } else {
-        Err(crate::error::McpError::validation_error("Must provide side c or set it to 0 to calculate"))
+        Err(crate::error::McpError::validation_error(
+            "Must provide side c or set it to 0 to calculate",
+        ))
     }
 }
 
-fn law_of_sines(side_a: Option<f64>, angle_a: f64, side_b: Option<f64>, angle_b: f64) -> McpResult<Value> {
+fn law_of_sines(
+    side_a: Option<f64>,
+    angle_a: f64,
+    side_b: Option<f64>,
+    angle_b: f64,
+) -> McpResult<Value> {
     match (side_a, side_b) {
         (Some(a), None) => {
             let b = a * angle_b.sin() / angle_a.sin();
@@ -245,7 +265,9 @@ fn law_of_sines(side_a: Option<f64>, angle_a: f64, side_b: Option<f64>, angle_b:
                 "match": (ratio_a - ratio_b).abs() < 1e-10
             }))
         }
-        (None, None) => Err(crate::error::McpError::validation_error("Must provide at least one side")),
+        (None, None) => Err(crate::error::McpError::validation_error(
+            "Must provide at least one side",
+        )),
     }
 }
 
@@ -256,4 +278,3 @@ fn degrees_to_radians(degrees: f64) -> McpResult<f64> {
 fn radians_to_degrees(radians: f64) -> McpResult<f64> {
     Ok(radians * 180.0 / std::f64::consts::PI)
 }
-

@@ -120,4 +120,3 @@ impl From<std::io::Error> for McpError {
         Self::internal_error(format!("IO error: {}", err))
     }
 }
-

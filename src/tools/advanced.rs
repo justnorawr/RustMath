@@ -1,6 +1,6 @@
 use crate::error::McpResult;
+use crate::utils::args::{get_bool_opt, get_number, get_number_opt, result_json};
 use serde_json::Value;
-use crate::utils::args::{get_number, get_number_opt, get_bool_opt, result_json};
 
 pub fn get_tool_definitions() -> Vec<Value> {
     vec![
@@ -41,7 +41,9 @@ pub fn execute(name: &str, arguments: &Value) -> McpResult<Value> {
             let rate = get_number(arguments, "rate")?;
             let time = get_number(arguments, "time")?;
             let continuous = get_bool_opt(arguments, "continuous");
-            Ok(result_json(exponential_growth(initial, rate, time, continuous)?))
+            Ok(result_json(exponential_growth(
+                initial, rate, time, continuous,
+            )?))
         }
         "logarithm" => {
             let value = get_number(arguments, "value")?;
@@ -49,11 +51,19 @@ pub fn execute(name: &str, arguments: &Value) -> McpResult<Value> {
             let natural = get_bool_opt(arguments, "natural");
             Ok(result_json(logarithm(value, base, natural)?))
         }
-        _ => Err(crate::error::McpError::tool_error(format!("Unknown advanced tool: {}", name))),
+        _ => Err(crate::error::McpError::tool_error(format!(
+            "Unknown advanced tool: {}",
+            name
+        ))),
     }
 }
 
-fn exponential_growth(initial: f64, rate: f64, time: f64, continuous: Option<bool>) -> McpResult<f64> {
+fn exponential_growth(
+    initial: f64,
+    rate: f64,
+    time: f64,
+    continuous: Option<bool>,
+) -> McpResult<f64> {
     if continuous.unwrap_or(false) {
         Ok(initial * (rate * time).exp())
     } else {
@@ -63,17 +73,20 @@ fn exponential_growth(initial: f64, rate: f64, time: f64, continuous: Option<boo
 
 fn logarithm(value: f64, base: Option<f64>, natural: Option<bool>) -> McpResult<f64> {
     if value <= 0.0 {
-        return Err(crate::error::McpError::validation_error("Logarithm is undefined for non-positive values"));
+        return Err(crate::error::McpError::validation_error(
+            "Logarithm is undefined for non-positive values",
+        ));
     }
     if natural.unwrap_or(false) {
         Ok(value.ln())
     } else if let Some(b) = base {
         if b <= 0.0 || b == 1.0 {
-            return Err(crate::error::McpError::validation_error("Invalid base for logarithm"));
+            return Err(crate::error::McpError::validation_error(
+                "Invalid base for logarithm",
+            ));
         }
         Ok(value.log(b))
     } else {
         Ok(value.log10())
     }
 }
-

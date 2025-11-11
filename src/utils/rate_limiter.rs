@@ -74,12 +74,11 @@ impl RateLimiter {
     /// assert!(!limiter.check_rate_limit()); // 3rd request: rate limited
     /// ```
     pub fn check_rate_limit(&self) -> bool {
-        let mut state = self.state.lock()
-            .unwrap_or_else(|poisoned| {
-                // Recover from poisoned mutex by taking ownership of the inner data
-                // This prevents cascading failures if a thread panics while holding the lock
-                poisoned.into_inner()
-            });
+        let mut state = self.state.lock().unwrap_or_else(|poisoned| {
+            // Recover from poisoned mutex by taking ownership of the inner data
+            // This prevents cascading failures if a thread panics while holding the lock
+            poisoned.into_inner()
+        });
 
         // Refill tokens based on elapsed time
         let now = Instant::now();
@@ -102,7 +101,9 @@ impl RateLimiter {
     ///
     /// Useful for monitoring and debugging.
     pub fn available_tokens(&self) -> f64 {
-        let mut state = self.state.lock()
+        let mut state = self
+            .state
+            .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
 
         // Refill tokens based on elapsed time

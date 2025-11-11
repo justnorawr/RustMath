@@ -3,8 +3,8 @@ extern crate rust_math_mcp;
 
 use rust_math_mcp::config::Config;
 use rust_math_mcp::error::McpResult;
-use rust_math_mcp::protocol::{handle_method_with_config, send_response};
 use rust_math_mcp::protocol::parser::parse_message;
+use rust_math_mcp::protocol::{handle_method_with_config, send_response};
 use rust_math_mcp::tools::DefaultToolRegistry;
 use std::io::{self, BufReader};
 use std::sync::Arc;
@@ -20,8 +20,7 @@ fn main() -> McpResult<()> {
         .with_thread_ids(false) // Disable thread IDs to reduce noise
         .with_thread_names(false) // Disable thread names to reduce noise
         .with_env_filter(
-            std::env::var("RUST_LOG")
-                .unwrap_or_else(|_| "rust_math_mcp=warn".to_string()) // Default to warn to reduce noise
+            std::env::var("RUST_LOG").unwrap_or_else(|_| "rust_math_mcp=warn".to_string()), // Default to warn to reduce noise
         )
         .init();
 
@@ -43,11 +42,17 @@ fn main() -> McpResult<()> {
         match parse_message(&mut reader) {
             Ok(parse_result) => {
                 // Log to stderr only (tracing is configured to use stderr)
-                debug!("Received request: method={}, id={:?}, format={}", 
-                    parse_result.request.method, 
+                debug!(
+                    "Received request: method={}, id={:?}, format={}",
+                    parse_result.request.method,
                     parse_result.request.id,
-                    if parse_result.uses_content_length { "Content-Length" } else { "raw JSON" });
-                
+                    if parse_result.uses_content_length {
+                        "Content-Length"
+                    } else {
+                        "raw JSON"
+                    }
+                );
+
                 let registry = DefaultToolRegistry;
                 let response = handle_method_with_config(
                     &parse_result.request.method,
@@ -56,7 +61,7 @@ fn main() -> McpResult<()> {
                     &registry,
                     Arc::clone(&config),
                 )?;
-                
+
                 // Use the same format as the request (match request format)
                 send_response(response, parse_result.uses_content_length)?;
             }

@@ -20,7 +20,7 @@ pub mod error_codes {
     pub const INVALID_PARAMS: i32 = -32602;
     /// Internal error
     pub const INTERNAL_ERROR: i32 = -32603;
-    
+
     /// Server error range: -32000 to -32099
     /// Tool execution error
     pub const TOOL_ERROR: i32 = -32000;
@@ -35,4 +35,3 @@ pub mod server {
     pub const DEFAULT_NAME: &str = "rust-math-mcp";
     pub const DEFAULT_VERSION: &str = "0.1.0";
 }
-

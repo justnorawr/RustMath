@@ -19,8 +19,14 @@ static TOOL_REGISTRY: Lazy<HashMap<&'static str, ToolExecutor>> = Lazy::new(|| {
 
     // Register basic math tools using const strings from modules
     registry.insert(basic_math::TOOL_ADD, basic_math::execute as ToolExecutor);
-    registry.insert(basic_math::TOOL_SUBTRACT, basic_math::execute as ToolExecutor);
-    registry.insert(basic_math::TOOL_MULTIPLY, basic_math::execute as ToolExecutor);
+    registry.insert(
+        basic_math::TOOL_SUBTRACT,
+        basic_math::execute as ToolExecutor,
+    );
+    registry.insert(
+        basic_math::TOOL_MULTIPLY,
+        basic_math::execute as ToolExecutor,
+    );
     registry.insert(basic_math::TOOL_DIVIDE, basic_math::execute as ToolExecutor);
     registry.insert(basic_math::TOOL_POWER, basic_math::execute as ToolExecutor);
     registry.insert(basic_math::TOOL_SQRT, basic_math::execute as ToolExecutor);
@@ -34,14 +40,46 @@ static TOOL_REGISTRY: Lazy<HashMap<&'static str, ToolExecutor>> = Lazy::new(|| {
     registry.insert(batch::TOOL_BATCH, batch::execute as ToolExecutor);
 
     // Register other tool categories (they still use the old approach temporarily)
-    register_tools_legacy(&mut registry, algebra::get_tool_definitions(), algebra::execute);
-    register_tools_legacy(&mut registry, statistics::get_tool_definitions(), statistics::execute);
-    register_tools_legacy(&mut registry, geometry::get_tool_definitions(), geometry::execute);
-    register_tools_legacy(&mut registry, equations::get_tool_definitions(), equations::execute);
-    register_tools_legacy(&mut registry, trigonometry::get_tool_definitions(), trigonometry::execute);
-    register_tools_legacy(&mut registry, finance::get_tool_definitions(), finance::execute);
-    register_tools_legacy(&mut registry, combinatorics::get_tool_definitions(), combinatorics::execute);
-    register_tools_legacy(&mut registry, advanced::get_tool_definitions(), advanced::execute);
+    register_tools_legacy(
+        &mut registry,
+        algebra::get_tool_definitions(),
+        algebra::execute,
+    );
+    register_tools_legacy(
+        &mut registry,
+        statistics::get_tool_definitions(),
+        statistics::execute,
+    );
+    register_tools_legacy(
+        &mut registry,
+        geometry::get_tool_definitions(),
+        geometry::execute,
+    );
+    register_tools_legacy(
+        &mut registry,
+        equations::get_tool_definitions(),
+        equations::execute,
+    );
+    register_tools_legacy(
+        &mut registry,
+        trigonometry::get_tool_definitions(),
+        trigonometry::execute,
+    );
+    register_tools_legacy(
+        &mut registry,
+        finance::get_tool_definitions(),
+        finance::execute,
+    );
+    register_tools_legacy(
+        &mut registry,
+        combinatorics::get_tool_definitions(),
+        combinatorics::execute,
+    );
+    register_tools_legacy(
+        &mut registry,
+        advanced::get_tool_definitions(),
+        advanced::execute,
+    );
 
     registry
 });
@@ -114,4 +152,3 @@ pub fn get_all_tools() -> Value {
 pub fn execute_tool(name: &str, arguments: &Value) -> McpResult<Value> {
     DefaultToolRegistry.execute_tool(name, arguments)
 }
-

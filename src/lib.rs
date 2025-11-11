@@ -7,4 +7,3 @@ pub mod utils;
 // Re-export commonly used types
 pub use error::{McpError, McpResult};
 pub use tools::{DefaultToolRegistry, ToolRegistry};
-

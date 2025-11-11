@@ -40,7 +40,7 @@ impl JsonRpcRequest {
 }
 
 /// JSON-RPC response structure
-/// 
+///
 /// Note: For request responses, `id` must match the request ID.
 /// For notifications (requests without ID), `id` should be None.
 #[derive(Debug, Serialize, Deserialize)]
@@ -130,34 +130,48 @@ pub fn send_response(response: JsonRpcResponse, use_content_length: bool) -> Mcp
         // (might be a notification response, which shouldn't happen per spec)
         debug!("Warning: Response without ID (might be notification response)");
     }
-    
+
     let json = serde_json::to_string(&response)?;
     let content_length = json.len();
-    
+
     // Log to stderr only (tracing is configured to use stderr)
-    debug!("Sending response: {} bytes, id={:?}, format={}", content_length, response.id, if use_content_length { "Content-Length" } else { "raw JSON" });
+    debug!(
+        "Sending response: {} bytes, id={:?}, format={}",
+        content_length,
+        response.id,
+        if use_content_length {
+            "Content-Length"
+        } else {
+            "raw JSON"
+        }
+    );
     // Only log full JSON in trace level to avoid stderr spam
     trace!("Response JSON: {}", json);
-    
+
     let mut stdout = io::stdout();
-    
+
     if use_content_length {
         // MCP stdio format: Content-Length header, blank line, then JSON
         // Format: "Content-Length: <number>\r\n\r\n<json>"
         let header = format!("Content-Length: {}\r\n\r\n", content_length);
-        stdout.write_all(header.as_bytes())
+        stdout
+            .write_all(header.as_bytes())
             .map_err(|e| McpError::internal_error(format!("Failed to write header: {}", e)))?;
         // Write JSON
-        stdout.write_all(json.as_bytes())
+        stdout
+            .write_all(json.as_bytes())
             .map_err(|e| McpError::internal_error(format!("Failed to write JSON: {}", e)))?;
     } else {
         // Raw JSON format (Claude Desktop): JSON followed by newline for message boundary
-        stdout.write_all(json.as_bytes())
+        stdout
+            .write_all(json.as_bytes())
             .map_err(|e| McpError::internal_error(format!("Failed to write JSON: {}", e)))?;
-        stdout.write_all(b"\n")
+        stdout
+            .write_all(b"\n")
             .map_err(|e| McpError::internal_error(format!("Failed to write newline: {}", e)))?;
     }
-    stdout.flush()
+    stdout
+        .flush()
         .map_err(|e| McpError::internal_error(format!("Failed to flush stdout: {}", e)))?;
     Ok(())
 }
@@ -271,7 +285,7 @@ pub fn handle_method_with_config<T: crate::tools::ToolRegistry>(
                         })),
                         error: None,
                     })
-                },
+                }
                 Err(e) => {
                     error!(
                         tool_name = %call_params.name,
@@ -343,4 +357,3 @@ pub fn handle_method<T: crate::tools::ToolRegistry>(
     let config = Arc::new(Config::new());
     handle_method_with_config(method, params, id, registry, config)
 }
-

@@ -283,7 +283,10 @@ mod tests {
 
         let result = execute(TOOL_BATCH, &args);
         assert!(result.is_err());
-        assert!(result.unwrap_err().message.contains("Duplicate operation ID"));
+        assert!(result
+            .unwrap_err()
+            .message
+            .contains("Duplicate operation ID"));
     }
 
     #[test]

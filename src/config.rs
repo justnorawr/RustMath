@@ -34,8 +34,9 @@ impl Default for Config {
         Self {
             server_name: env::var("MCP_SERVER_NAME")
                 .unwrap_or_else(|_| crate::protocol::constants::server::DEFAULT_NAME.to_string()),
-            server_version: env::var("MCP_SERVER_VERSION")
-                .unwrap_or_else(|_| crate::protocol::constants::server::DEFAULT_VERSION.to_string()),
+            server_version: env::var("MCP_SERVER_VERSION").unwrap_or_else(|_| {
+                crate::protocol::constants::server::DEFAULT_VERSION.to_string()
+            }),
             max_array_size: env::var("MCP_MAX_ARRAY_SIZE")
                 .ok()
                 .and_then(|v| v.parse().ok())
@@ -47,7 +48,7 @@ impl Default for Config {
             enable_rate_limit: env::var("MCP_ENABLE_RATE_LIMIT")
                 .ok()
                 .and_then(|v| v.parse().ok())
-                .unwrap_or(true),  // Enabled by default for security
+                .unwrap_or(true), // Enabled by default for security
             max_requests_per_second: env::var("MCP_MAX_REQUESTS_PER_SECOND")
                 .ok()
                 .and_then(|v| v.parse().ok())
@@ -72,4 +73,3 @@ impl Config {
         &self.server_version
     }
 }
-

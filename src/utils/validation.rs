@@ -40,7 +40,9 @@ pub fn validate_finite(value: f64, name: &str) -> McpResult<()> {
 /// Validate decimal places for rounding operations
 pub fn validate_decimal_places(places: i32, config: &Config) -> McpResult<()> {
     if places < 0 {
-        return Err(McpError::validation_error("Decimal places must be non-negative"));
+        return Err(McpError::validation_error(
+            "Decimal places must be non-negative",
+        ));
     }
     if places > config.max_decimal_places {
         return Err(McpError::validation_error(format!(
@@ -81,7 +83,7 @@ pub fn validate_integer(value: f64, name: &str) -> McpResult<i64> {
             name, value
         )));
     }
-    
+
     // Check if value is within i64 range
     if value < i64::MIN as f64 || value > i64::MAX as f64 {
         return Err(McpError::validation_error(format!(
@@ -89,7 +91,6 @@ pub fn validate_integer(value: f64, name: &str) -> McpResult<i64> {
             name
         )));
     }
-    
+
     Ok(value as i64)
 }
-

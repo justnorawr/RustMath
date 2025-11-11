@@ -1,6 +1,6 @@
 use crate::error::McpResult;
-use serde_json::Value;
 use crate::utils::args::{get_number, get_number_opt, result_json, result_value};
+use serde_json::Value;
 
 pub fn get_tool_definitions() -> Vec<Value> {
     vec![
@@ -54,7 +54,12 @@ pub fn execute(name: &str, arguments: &Value) -> McpResult<Value> {
             let rate = get_number(arguments, "rate")?;
             let time = get_number(arguments, "time")?;
             let compounds_per_year = get_number_opt(arguments, "compounds_per_year");
-            Ok(result_json(compound_interest(principal, rate, time, compounds_per_year)?))
+            Ok(result_json(compound_interest(
+                principal,
+                rate,
+                time,
+                compounds_per_year,
+            )?))
         }
         "simple_interest" => {
             let principal = get_number(arguments, "principal")?;
@@ -68,11 +73,19 @@ pub fn execute(name: &str, arguments: &Value) -> McpResult<Value> {
             let percent = get_number_opt(arguments, "percent");
             Ok(result_value(percentage(part, whole, percent)?))
         }
-        _ => Err(crate::error::McpError::tool_error(format!("Unknown finance tool: {}", name))),
+        _ => Err(crate::error::McpError::tool_error(format!(
+            "Unknown finance tool: {}",
+            name
+        ))),
     }
 }
 
-fn compound_interest(principal: f64, rate: f64, time: f64, compounds_per_year: Option<f64>) -> McpResult<f64> {
+fn compound_interest(
+    principal: f64,
+    rate: f64,
+    time: f64,
+    compounds_per_year: Option<f64>,
+) -> McpResult<f64> {
     let n = compounds_per_year.unwrap_or(1.0);
     Ok(principal * (1.0 + rate / n).powf(n * time))
 }
@@ -93,7 +106,8 @@ fn percentage(part: Option<f64>, whole: f64, percent: Option<f64>) -> McpResult<
                 "match": (calculated_percent - perc).abs() < 0.0001
             }))
         }
-        (None, None) => Err(crate::error::McpError::validation_error("Must provide either 'part' or 'percent'")),
+        (None, None) => Err(crate::error::McpError::validation_error(
+            "Must provide either 'part' or 'percent'",
+        )),
     }
 }
-

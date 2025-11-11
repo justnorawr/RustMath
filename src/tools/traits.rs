@@ -23,7 +23,7 @@ pub trait ToolRegistry {
     /// Returns a `Value` containing an array of tool definition objects,
     /// each with `name`, `description`, and `inputSchema` fields.
     fn get_all_tools(&self) -> Value;
-    
+
     /// Execute a tool by name with the given arguments.
     ///
     /// # Arguments
@@ -37,4 +37,3 @@ pub trait ToolRegistry {
     /// if the tool is not found or execution fails.
     fn execute_tool(&self, name: &str, arguments: &Value) -> McpResult<Value>;
 }
-

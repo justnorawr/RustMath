@@ -42,24 +42,26 @@ pub struct ParseResult {
 pub fn parse_message<R: BufRead>(reader: &mut R) -> McpResult<ParseResult> {
     // Try to peek at the first bytes to determine the format
     // This avoids blocking on read_line if there's no newline
-    let buffer = reader.fill_buf()
+    let buffer = reader
+        .fill_buf()
         .map_err(|e| McpError::internal_error(format!("Failed to read input: {}", e)))?;
-    
+
     // Handle EOF gracefully (clean shutdown)
     if buffer.is_empty() {
         return Err(McpError::new(-32001, "EOF: clean shutdown"));
     }
-    
+
     // Check if it starts with '{' (raw JSON) or "Content-Length:" (MCP stdio format)
     let starts_with_json = buffer.first().map(|&b| b == b'{').unwrap_or(false);
     let starts_with_header = buffer.starts_with(b"Content-Length:");
-    
+
     if starts_with_header {
         // MCP stdio format with Content-Length header
         let mut first_line = String::new();
-        reader.read_line(&mut first_line)
+        reader
+            .read_line(&mut first_line)
             .map_err(|e| McpError::internal_error(format!("Failed to read header: {}", e)))?;
-        
+
         let trimmed = first_line.trim();
         // Parse Content-Length header format
         let length: usize = trimmed
@@ -67,7 +69,9 @@ pub fn parse_message<R: BufRead>(reader: &mut R) -> McpResult<ParseResult> {
             .nth(1)
             .ok_or_else(|| McpError::invalid_request("Invalid Content-Length header format"))?
             .parse()
-            .map_err(|e| McpError::invalid_request(format!("Invalid Content-Length value: {}", e)))?;
+            .map_err(|e| {
+                McpError::invalid_request(format!("Invalid Content-Length value: {}", e))
+            })?;
 
         // Prevent memory exhaustion attacks
         if length > MAX_CONTENT_LENGTH {
@@ -79,14 +83,16 @@ pub fn parse_message<R: BufRead>(reader: &mut R) -> McpResult<ParseResult> {
 
         // Read blank line after header
         let mut blank_line = String::new();
-        reader.read_line(&mut blank_line)
+        reader
+            .read_line(&mut blank_line)
             .map_err(|e| McpError::internal_error(format!("Failed to read blank line: {}", e)))?;
 
         // Read the actual JSON message
         let mut json_buffer = vec![0u8; length];
-        reader.read_exact(&mut json_buffer)
+        reader
+            .read_exact(&mut json_buffer)
             .map_err(|e| McpError::internal_error(format!("Failed to read JSON message: {}", e)))?;
-        
+
         let json_str = String::from_utf8(json_buffer)
             .map_err(|e| McpError::parse_error(format!("Invalid UTF-8 in message: {}", e)))?;
 
@@ -109,8 +115,9 @@ pub fn parse_message<R: BufRead>(reader: &mut R) -> McpResult<ParseResult> {
         // Most MCP messages fit on a single line
         loop {
             let mut line = String::new();
-            let bytes_read = reader.read_line(&mut line)
-                .map_err(|e| McpError::internal_error(format!("Failed to read JSON line: {}", e)))?;
+            let bytes_read = reader.read_line(&mut line).map_err(|e| {
+                McpError::internal_error(format!("Failed to read JSON line: {}", e))
+            })?;
 
             // EOF check
             if bytes_read == 0 {
@@ -168,13 +175,18 @@ pub fn parse_message<R: BufRead>(reader: &mut R) -> McpResult<ParseResult> {
     } else {
         // Unknown format - try to read a line to see what we got
         let mut first_line = String::new();
-        reader.read_line(&mut first_line)
+        reader
+            .read_line(&mut first_line)
             .map_err(|e| McpError::internal_error(format!("Failed to read input: {}", e)))?;
         let trimmed = first_line.trim();
         debug!("Unknown input format, first line: {:?}", trimmed);
         Err(McpError::invalid_request(format!(
             "Unknown message format, expected Content-Length header or JSON, got: {}",
-            if trimmed.len() > 50 { format!("{}...", &trimmed[..50]) } else { trimmed.to_string() }
+            if trimmed.len() > 50 {
+                format!("{}...", &trimmed[..50])
+            } else {
+                trimmed.to_string()
+            }
         )))
     }
 }

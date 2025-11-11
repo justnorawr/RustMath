@@ -1,6 +1,6 @@
 use crate::error::McpResult;
-use serde_json::Value;
 use crate::utils::args::{get_number, result_json};
+use serde_json::Value;
 
 pub fn get_tool_definitions() -> Vec<Value> {
     vec![
@@ -143,9 +143,14 @@ pub fn execute(name: &str, arguments: &Value) -> McpResult<Value> {
             let length = get_number(arguments, "length")?;
             let width = get_number(arguments, "width")?;
             let height = get_number(arguments, "height")?;
-            Ok(result_json(volume_rectangular_prism(length, width, height)?))
+            Ok(result_json(volume_rectangular_prism(
+                length, width, height,
+            )?))
         }
-        _ => Err(crate::error::McpError::tool_error(format!("Unknown geometry tool: {}", name))),
+        _ => Err(crate::error::McpError::tool_error(format!(
+            "Unknown geometry tool: {}",
+            name
+        ))),
     }
 }
 
@@ -180,4 +185,3 @@ fn volume_cone(radius: f64, height: f64) -> McpResult<f64> {
 fn volume_rectangular_prism(length: f64, width: f64, height: f64) -> McpResult<f64> {
     Ok(length * width * height)
 }
-

@@ -1,7 +1,7 @@
 use crate::error::McpResult;
+use crate::utils::args::{get_bool_opt, get_number_array, result_json, result_value};
 use serde_json::Value;
 use std::collections::HashMap;
-use crate::utils::args::{get_number_array, get_bool_opt, result_json, result_value};
 
 pub fn get_tool_definitions() -> Vec<Value> {
     vec![
@@ -191,20 +191,27 @@ pub fn execute(name: &str, arguments: &Value) -> McpResult<Value> {
             let numbers = get_number_array(arguments, "numbers")?;
             Ok(result_json(product(numbers)?))
         }
-        _ => Err(crate::error::McpError::tool_error(format!("Unknown statistics tool: {}", name))),
+        _ => Err(crate::error::McpError::tool_error(format!(
+            "Unknown statistics tool: {}",
+            name
+        ))),
     }
 }
 
 fn mean(numbers: Vec<f64>) -> McpResult<f64> {
     if numbers.is_empty() {
-        return Err(crate::error::McpError::validation_error("Cannot calculate mean of empty array"));
+        return Err(crate::error::McpError::validation_error(
+            "Cannot calculate mean of empty array",
+        ));
     }
     Ok(numbers.iter().sum::<f64>() / numbers.len() as f64)
 }
 
 fn median(numbers: Vec<f64>) -> McpResult<f64> {
     if numbers.is_empty() {
-        return Err(crate::error::McpError::validation_error("Cannot calculate median of empty array"));
+        return Err(crate::error::McpError::validation_error(
+            "Cannot calculate median of empty array",
+        ));
     }
     let mut sorted = numbers;
     sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
@@ -218,7 +225,9 @@ fn median(numbers: Vec<f64>) -> McpResult<f64> {
 
 fn mode(numbers: Vec<f64>) -> McpResult<Value> {
     if numbers.is_empty() {
-        return Err(crate::error::McpError::validation_error("Cannot calculate mode of empty array"));
+        return Err(crate::error::McpError::validation_error(
+            "Cannot calculate mode of empty array",
+        ));
     }
     let mut frequency: HashMap<String, usize> = HashMap::new();
     for num in &numbers {
@@ -231,7 +240,7 @@ fn mode(numbers: Vec<f64>) -> McpResult<Value> {
         .filter(|(_, &freq)| freq == max_freq)
         .filter_map(|(key, _)| key.parse::<f64>().ok())
         .collect();
-    
+
     if modes.len() == numbers.len() {
         Ok(serde_json::json!({"mode": null, "message": "No mode - all values are unique"}))
     } else {
@@ -241,7 +250,9 @@ fn mode(numbers: Vec<f64>) -> McpResult<Value> {
 
 fn variance(numbers: Vec<f64>, sample: Option<bool>) -> McpResult<f64> {
     if numbers.is_empty() {
-        return Err(crate::error::McpError::validation_error("Cannot calculate variance of empty array"));
+        return Err(crate::error::McpError::validation_error(
+            "Cannot calculate variance of empty array",
+        ));
     }
     let mean_val = mean(numbers.clone())?;
     let n = numbers.len() as f64;
@@ -281,4 +292,3 @@ fn sum(numbers: Vec<f64>) -> McpResult<f64> {
 fn product(numbers: Vec<f64>) -> McpResult<f64> {
     Ok(numbers.iter().product())
 }
-

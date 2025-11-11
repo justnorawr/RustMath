@@ -1,6 +1,6 @@
 use crate::error::McpResult;
-use serde_json::Value;
 use crate::utils::args::{get_number, get_number_opt, result_json, result_value};
+use serde_json::Value;
 
 pub fn get_tool_definitions() -> Vec<Value> {
     vec![
@@ -110,13 +110,18 @@ pub fn execute(name: &str, arguments: &Value) -> McpResult<Value> {
             let y2 = get_number(arguments, "y2")?;
             Ok(result_value(midpoint(x1, y1, x2, y2)?))
         }
-        _ => Err(crate::error::McpError::tool_error(format!("Unknown equations tool: {}", name))),
+        _ => Err(crate::error::McpError::tool_error(format!(
+            "Unknown equations tool: {}",
+            name
+        ))),
     }
 }
 
 fn quadratic_formula(a: f64, b: f64, c: f64) -> McpResult<Value> {
     if a == 0.0 {
-        return Err(crate::error::McpError::validation_error("Coefficient 'a' cannot be zero for quadratic equation"));
+        return Err(crate::error::McpError::validation_error(
+            "Coefficient 'a' cannot be zero for quadratic equation",
+        ));
     }
     let discriminant = b * b - 4.0 * a * c;
     if discriminant < 0.0 {
@@ -157,7 +162,9 @@ fn pythagorean_theorem(a: f64, b: f64, c: Option<f64>) -> McpResult<f64> {
         } else if b == 0.0 {
             Ok((c_val * c_val - a * a).sqrt())
         } else {
-            Err(crate::error::McpError::validation_error("Cannot determine which side to calculate"))
+            Err(crate::error::McpError::validation_error(
+                "Cannot determine which side to calculate",
+            ))
         }
     } else {
         Ok((a * a + b * b).sqrt())
@@ -166,7 +173,9 @@ fn pythagorean_theorem(a: f64, b: f64, c: Option<f64>) -> McpResult<f64> {
 
 fn slope(x1: f64, y1: f64, x2: f64, y2: f64) -> McpResult<f64> {
     if (x2 - x1).abs() < 1e-10 {
-        return Err(crate::error::McpError::validation_error("Slope is undefined (vertical line)"));
+        return Err(crate::error::McpError::validation_error(
+            "Slope is undefined (vertical line)",
+        ));
     }
     Ok((y2 - y1) / (x2 - x1))
 }
@@ -177,4 +186,3 @@ fn midpoint(x1: f64, y1: f64, x2: f64, y2: f64) -> McpResult<Value> {
         "y": (y1 + y2) / 2.0
     }))
 }
-

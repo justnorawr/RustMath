@@ -20,21 +20,21 @@ fn test_claude_desktop_response_format() {
         })),
         error: None, // Should not be present
     };
-    
+
     let json_str = serde_json::to_string(&response).unwrap();
     let parsed: Value = serde_json::from_str(&json_str).unwrap();
-    
+
     // Claude Desktop requirements:
     // 1. id must be present and non-null (string or number)
     assert!(parsed["id"].is_number() || parsed["id"].is_string());
     assert!(!parsed["id"].is_null());
-    
+
     // 2. result must be present
     assert!(parsed["result"].is_object());
-    
+
     // 3. error should not be present (or should be null/undefined)
     assert!(parsed.get("error").is_none() || parsed["error"].is_null());
-    
+
     println!("Response format: {}", json_str);
 }
 
@@ -54,17 +54,17 @@ fn test_tools_call_response_format() {
         })),
         error: None,
     };
-    
+
     let json_str = serde_json::to_string(&response).unwrap();
     let parsed: Value = serde_json::from_str(&json_str).unwrap();
-    
+
     // Verify format
     assert!(parsed["id"].is_number());
     assert!(parsed["result"].is_object());
     assert!(parsed["result"]["content"].is_array());
     assert_eq!(parsed["result"]["content"][0]["type"], "text");
     assert!(parsed.get("error").is_none());
-    
+
     println!("Tools call response format: {}", json_str);
 }
 
@@ -85,16 +85,15 @@ fn test_error_response_format() {
         })),
         error: None, // Must not be present
     };
-    
+
     let json_str = serde_json::to_string(&response).unwrap();
     let parsed: Value = serde_json::from_str(&json_str).unwrap();
-    
+
     // Verify error format
     assert!(parsed["id"].is_number());
     assert!(parsed["result"].is_object());
     assert!(parsed.get("error").is_none()); // Critical: error field must not exist
     assert_eq!(parsed["result"]["isError"], true);
-    
+
     println!("Error response format: {}", json_str);
 }
-
