@@ -98,23 +98,42 @@ pub fn parse_message<R: BufRead>(reader: &mut R) -> McpResult<ParseResult> {
             uses_content_length: true,
         })
     } else if starts_with_json {
-        // It's raw JSON (Claude Desktop format) - read the entire JSON object
-        // Read the initial buffer (already peeked)
-        let mut json_buffer = Vec::new();
-        let initial_len = buffer.len();
-        json_buffer.extend_from_slice(buffer);
-        reader.consume(initial_len);
-        
-        // Try to parse immediately - JSON is likely complete in first read
-        // If not, we'll read more, but limit to prevent blocking
+        // It's raw JSON (Claude Desktop format) - read until we find a complete JSON object
+        // Strategy: Read line by line until we have valid JSON
+        // Claude Desktop sends JSON objects terminated by newlines
+
+        let mut json_buffer = String::new();
         const MAX_JSON_SIZE: usize = 10_000_000;
-        let mut total_read = json_buffer.len();
-        let mut parse_attempts = 0;
-        const MAX_PARSE_ATTEMPTS: usize = 10; // Limit read attempts to prevent blocking
-        
+
+        // Read lines until we get a complete JSON object
+        // Most MCP messages fit on a single line
         loop {
-            // Try parsing what we have
-            match serde_json::from_slice::<JsonRpcRequest>(&json_buffer) {
+            let mut line = String::new();
+            let bytes_read = reader.read_line(&mut line)
+                .map_err(|e| McpError::internal_error(format!("Failed to read JSON line: {}", e)))?;
+
+            // EOF check
+            if bytes_read == 0 {
+                if json_buffer.is_empty() {
+                    return Err(McpError::new(-32001, "EOF: clean shutdown"));
+                }
+                // Try to parse what we have
+                break;
+            }
+
+            json_buffer.push_str(&line);
+
+            // Size check
+            if json_buffer.len() > MAX_JSON_SIZE {
+                return Err(McpError::resource_limit(format!(
+                    "JSON message exceeds maximum size of {} bytes",
+                    MAX_JSON_SIZE
+                )));
+            }
+
+            // Try to parse after each line
+            let trimmed = json_buffer.trim();
+            match serde_json::from_str::<JsonRpcRequest>(trimmed) {
                 Ok(request) => {
                     request.validate()?;
                     return Ok(ParseResult {
@@ -122,46 +141,25 @@ pub fn parse_message<R: BufRead>(reader: &mut R) -> McpResult<ParseResult> {
                         uses_content_length: false,
                     });
                 }
-                Err(e) if e.is_eof() || e.is_data() => {
-                    // Need more data, but only try a few times to avoid blocking
-                    if parse_attempts >= MAX_PARSE_ATTEMPTS {
-                        // We've tried enough - parse what we have as string (might be complete)
-                        break;
-                    }
-                    parse_attempts += 1;
-                    
-                    // Try to read more data
-                    let more_buffer = reader.fill_buf()
-                        .map_err(|e| McpError::internal_error(format!("Failed to read JSON: {}", e)))?;
-                    
-                    if more_buffer.is_empty() {
-                        // No more data - try parsing what we have
-                        break;
-                    }
-                    
-                    if total_read + more_buffer.len() > MAX_JSON_SIZE {
-                        return Err(McpError::resource_limit(format!(
-                            "JSON message exceeds maximum size of {} bytes",
-                            MAX_JSON_SIZE
-                        )));
-                    }
-                    
-                    let consumed = more_buffer.len();
-                    json_buffer.extend_from_slice(more_buffer);
-                    reader.consume(consumed);
-                    total_read += consumed;
+                Err(e) if e.is_eof() => {
+                    // Need more lines - continue reading
+                    continue;
                 }
                 Err(_) => {
-                    // Real parse error - try as string with trimming
-                    break;
+                    // If we have a newline, this should be a complete message
+                    // Try parsing anyway in case of formatting issues
+                    if line.ends_with('\n') {
+                        break;
+                    }
+                    // Otherwise continue reading
+                    continue;
                 }
             }
         }
-        
-        // Try parsing as string in case there's trailing whitespace/newline
-        let json_str = String::from_utf8(json_buffer)
-            .map_err(|e| McpError::parse_error(format!("Invalid UTF-8 in message: {}", e)))?;
-        let request: JsonRpcRequest = serde_json::from_str(json_str.trim())?;
+
+        // Final parse attempt with trimming
+        let trimmed = json_buffer.trim();
+        let request: JsonRpcRequest = serde_json::from_str(trimmed)?;
         request.validate()?;
         Ok(ParseResult {
             request,

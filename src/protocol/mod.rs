@@ -147,10 +147,16 @@ pub fn send_response(response: JsonRpcResponse, use_content_length: bool) -> Mcp
         let header = format!("Content-Length: {}\r\n\r\n", content_length);
         stdout.write_all(header.as_bytes())
             .map_err(|e| McpError::internal_error(format!("Failed to write header: {}", e)))?;
+        // Write JSON
+        stdout.write_all(json.as_bytes())
+            .map_err(|e| McpError::internal_error(format!("Failed to write JSON: {}", e)))?;
+    } else {
+        // Raw JSON format (Claude Desktop): JSON followed by newline for message boundary
+        stdout.write_all(json.as_bytes())
+            .map_err(|e| McpError::internal_error(format!("Failed to write JSON: {}", e)))?;
+        stdout.write_all(b"\n")
+            .map_err(|e| McpError::internal_error(format!("Failed to write newline: {}", e)))?;
     }
-    // Write JSON (with or without header)
-    stdout.write_all(json.as_bytes())
-        .map_err(|e| McpError::internal_error(format!("Failed to write JSON: {}", e)))?;
     stdout.flush()
         .map_err(|e| McpError::internal_error(format!("Failed to flush stdout: {}", e)))?;
     Ok(())
