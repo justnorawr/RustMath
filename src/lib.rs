@@ -1,9 +1,7 @@
-pub mod config;
-pub mod error;
-pub mod protocol;
-pub mod tools;
-pub mod utils;
+// Library crate for Rust Math MCP
+// Main functionality is in the binary crate in src/main.rs
 
-// Re-export commonly used types
-pub use error::{McpError, McpResult};
-pub use tools::{DefaultToolRegistry, ToolRegistry};
+pub mod service;
+
+// Re-export service for use in tests
+pub use service::MathService;
