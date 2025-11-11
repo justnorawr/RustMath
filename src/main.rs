@@ -8,7 +8,7 @@ use rust_math_mcp::protocol::parser::parse_message;
 use rust_math_mcp::tools::DefaultToolRegistry;
 use std::io::{self, BufReader};
 use std::sync::Arc;
-use tracing::{error, info};
+use tracing::{debug, error};
 
 fn main() -> McpResult<()> {
     // Configure tracing to write to stderr to avoid polluting stdout (MCP protocol)

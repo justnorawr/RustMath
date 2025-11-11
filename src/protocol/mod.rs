@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::io::{self, Write};
 use std::sync::Arc;
-use tracing::{debug, error, instrument, span, Level};
+use tracing::{debug, error, instrument, span, trace, Level};
 
 pub use constants::*;
 
