@@ -1,0 +1,279 @@
+pub mod constants;
+pub mod parser;
+
+use crate::config::Config;
+use crate::error::{McpError, McpResult};
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use std::io::{self, Write};
+use std::sync::Arc;
+use tracing::{debug, error, instrument, span, Level};
+
+pub use constants::*;
+
+/// JSON-RPC 2.0 request structure.
+///
+/// Represents an incoming request from an MCP client.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct JsonRpcRequest {
+    pub jsonrpc: String,
+    pub id: Option<Value>,
+    pub method: String,
+    pub params: Option<Value>,
+}
+
+impl JsonRpcRequest {
+    /// Validate the JSON-RPC version
+    pub fn validate(&self) -> McpResult<()> {
+        if self.jsonrpc != constants::JSON_RPC_VERSION {
+            return Err(McpError::invalid_request(format!(
+                "Invalid JSON-RPC version: expected '{}', got '{}'",
+                constants::JSON_RPC_VERSION,
+                self.jsonrpc
+            )));
+        }
+        Ok(())
+    }
+}
+
+/// JSON-RPC response structure
+#[derive(Debug, Serialize, Deserialize)]
+pub struct JsonRpcResponse {
+    pub jsonrpc: String,
+    pub id: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub result: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<JsonRpcError>,
+}
+
+/// JSON-RPC error structure
+#[derive(Debug, Serialize, Deserialize)]
+pub struct JsonRpcError {
+    pub code: i32,
+    pub message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data: Option<Value>,
+}
+
+impl From<crate::error::McpError> for JsonRpcError {
+    fn from(err: crate::error::McpError) -> Self {
+        Self {
+            code: err.code,
+            message: err.message,
+            data: err.data,
+        }
+    }
+}
+
+/// Server information
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ServerInfo {
+    pub name: String,
+    pub version: String,
+}
+
+/// Initialize parameters
+#[derive(Debug, Serialize, Deserialize)]
+pub struct InitializeParams {
+    pub protocol_version: String,
+    pub capabilities: Value,
+    pub client_info: Value,
+}
+
+/// Initialize result
+#[derive(Debug, Serialize, Deserialize)]
+pub struct InitializeResult {
+    pub protocol_version: String,
+    pub capabilities: Value,
+    pub server_info: ServerInfo,
+}
+
+/// Tool call parameters
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ToolCallParams {
+    pub name: String,
+    pub arguments: Value,
+}
+
+/// Send a JSON-RPC response to stdout.
+///
+/// Formats the response according to MCP protocol:
+/// - Content-Length header
+/// - Blank line
+/// - JSON message
+///
+/// # Arguments
+///
+/// * `response` - The JSON-RPC response to send
+#[instrument(skip(response))]
+pub fn send_response(response: JsonRpcResponse) -> McpResult<()> {
+    let json = serde_json::to_string(&response)?;
+    let content_length = json.len();
+    
+    debug!("Sending response: {} bytes", content_length);
+    
+    println!("Content-Length: {}\r\n\r\n{}", content_length, json);
+    io::stdout().flush()?;
+    Ok(())
+}
+
+/// Handle the initialize method.
+///
+/// Responds to MCP client initialization with server capabilities and information.
+///
+/// # Arguments
+///
+/// * `params` - Initialize parameters from the client
+/// * `config` - Server configuration
+#[instrument(skip(config))]
+pub fn handle_initialize(params: InitializeParams, config: &Config) -> McpResult<JsonRpcResponse> {
+    debug!(
+        protocol_version = %params.protocol_version,
+        "Handling initialize request"
+    );
+
+    let result = InitializeResult {
+        protocol_version: params.protocol_version,
+        capabilities: serde_json::json!({
+            "tools": {}
+        }),
+        server_info: ServerInfo {
+            name: config.server_name().to_string(),
+            version: config.server_version().to_string(),
+        },
+    };
+
+    Ok(JsonRpcResponse {
+        jsonrpc: constants::JSON_RPC_VERSION.to_string(),
+        id: None,
+        result: Some(serde_json::to_value(result)?),
+        error: None,
+    })
+}
+
+/// Handle a JSON-RPC method call with Arc<Config>.
+///
+/// Routes method calls to appropriate handlers:
+/// - `initialize`: Server initialization
+/// - `tools/list`: List all available tools
+/// - `tools/call`: Execute a tool
+///
+/// # Arguments
+///
+/// * `method` - The method name
+/// * `params` - Optional method parameters
+/// * `id` - Request ID for response correlation
+/// * `registry` - Tool registry for tool operations
+/// * `config` - Shared configuration (Arc)
+#[instrument(skip(registry, config))]
+pub fn handle_method_with_config<T: crate::tools::ToolRegistry>(
+    method: &str,
+    params: Option<Value>,
+    id: Option<Value>,
+    registry: &T,
+    config: Arc<Config>,
+) -> McpResult<JsonRpcResponse> {
+    let span = span!(Level::DEBUG, "handle_method", method = method);
+    let _enter = span.enter();
+
+    match method {
+        constants::methods::INITIALIZE => {
+            let init_params: InitializeParams = serde_json::from_value(
+                params.ok_or_else(|| McpError::invalid_params("Missing params"))?,
+            )?;
+            let mut response = handle_initialize(init_params, &config)?;
+            response.id = id;
+            Ok(response)
+        }
+        constants::methods::TOOLS_LIST => {
+            debug!("Listing tools");
+            let result = serde_json::json!({
+                "tools": registry.get_all_tools()
+            });
+            Ok(JsonRpcResponse {
+                jsonrpc: constants::JSON_RPC_VERSION.to_string(),
+                id,
+                result: Some(result),
+                error: None,
+            })
+        }
+        constants::methods::TOOLS_CALL => {
+            let call_params: ToolCallParams = serde_json::from_value(
+                params.ok_or_else(|| McpError::invalid_params("Missing params"))?,
+            )?;
+
+            debug!(
+                tool_name = %call_params.name,
+                "Executing tool"
+            );
+
+            match registry.execute_tool(&call_params.name, &call_params.arguments) {
+                Ok(result) => Ok(JsonRpcResponse {
+                    jsonrpc: constants::JSON_RPC_VERSION.to_string(),
+                    id,
+                    result: Some(serde_json::json!({
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": serde_json::to_string(&result)?
+                            }
+                        ]
+                    })),
+                    error: None,
+                }),
+                Err(e) => {
+                    error!(
+                        tool_name = %call_params.name,
+                        error = %e,
+                        "Tool execution error"
+                    );
+                    Ok(JsonRpcResponse {
+                        jsonrpc: constants::JSON_RPC_VERSION.to_string(),
+                        id,
+                        result: None,
+                        error: Some(JsonRpcError::from(e)),
+                    })
+                }
+            }
+        }
+        _ => {
+            error!(method = %method, "Method not found");
+            Ok(JsonRpcResponse {
+                jsonrpc: constants::JSON_RPC_VERSION.to_string(),
+                id,
+                result: None,
+                error: Some(JsonRpcError {
+                    code: constants::error_codes::METHOD_NOT_FOUND,
+                    message: format!("Method not found: {}", method),
+                    data: None,
+                }),
+            })
+        }
+    }
+}
+
+/// Handle a JSON-RPC method call (legacy, creates config on each call).
+///
+/// Routes method calls to appropriate handlers:
+/// - `initialize`: Server initialization
+/// - `tools/list`: List all available tools
+/// - `tools/call`: Execute a tool
+///
+/// # Arguments
+///
+/// * `method` - The method name
+/// * `params` - Optional method parameters
+/// * `id` - Request ID for response correlation
+/// * `registry` - Tool registry for tool operations
+#[instrument(skip(registry))]
+pub fn handle_method<T: crate::tools::ToolRegistry>(
+    method: &str,
+    params: Option<Value>,
+    id: Option<Value>,
+    registry: &T,
+) -> McpResult<JsonRpcResponse> {
+    let config = Arc::new(Config::new());
+    handle_method_with_config(method, params, id, registry, config)
+}
+
