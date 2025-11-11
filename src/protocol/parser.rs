@@ -1,6 +1,7 @@
 use crate::error::{McpError, McpResult};
 use crate::protocol::JsonRpcRequest;
 use std::io::BufRead;
+use tracing::debug;
 
 /// Maximum allowed Content-Length to prevent memory exhaustion attacks.
 /// Set to 10MB - enough for large tool calls but prevents DoS.
@@ -43,10 +44,15 @@ pub fn parse_message<R: BufRead>(reader: &mut R) -> McpResult<JsonRpcRequest> {
     }
 
     // Parse Content-Length
-    if !content_length_line.starts_with("Content-Length:") {
-        return Err(McpError::invalid_request(
-            "Expected Content-Length header, got invalid input"
-        ));
+    // Trim the line to handle any trailing whitespace/newlines
+    let trimmed = content_length_line.trim();
+    if !trimmed.starts_with("Content-Length:") {
+        // Log what we actually received for debugging
+        debug!("Expected Content-Length header, got: {:?}", trimmed);
+        return Err(McpError::invalid_request(format!(
+            "Expected Content-Length header, got: {}",
+            if trimmed.len() > 50 { format!("{}...", &trimmed[..50]) } else { trimmed.to_string() }
+        )));
     }
 
     let length: usize = content_length_line
