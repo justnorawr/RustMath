@@ -41,22 +41,24 @@ fn main() -> McpResult<()> {
 
     loop {
         match parse_message(&mut reader) {
-            Ok(request) => {
+            Ok(parse_result) => {
                 // Log to stderr only (tracing is configured to use stderr)
-                debug!("Received request: method={}, id={:?}", request.method, request.id);
+                debug!("Received request: method={}, id={:?}, format={}", 
+                    parse_result.request.method, 
+                    parse_result.request.id,
+                    if parse_result.uses_content_length { "Content-Length" } else { "raw JSON" });
                 
                 let registry = DefaultToolRegistry;
                 let response = handle_method_with_config(
-                    &request.method,
-                    request.params,
-                    request.id.clone(),
+                    &parse_result.request.method,
+                    parse_result.request.params,
+                    parse_result.request.id.clone(),
                     &registry,
                     Arc::clone(&config),
                 )?;
                 
-                // Log to stderr only
-                debug!("Sending response: id={:?}", response.id);
-                send_response(response)?;
+                // Use the same format as the request (match request format)
+                send_response(response, parse_result.uses_content_length)?;
             }
             Err(e) => {
                 error!("Error parsing message: {}", e);
@@ -64,6 +66,7 @@ fn main() -> McpResult<()> {
                 // However, if the parse completely fails, we might not be able to send a proper response
                 // Try to send an error response, but if it fails, just log and continue
                 // Claude Desktop might not accept responses with null ID, so we'll try anyway
+                // For parse errors, default to raw JSON format (Claude Desktop format)
                 match send_response(rust_math_mcp::protocol::JsonRpcResponse {
                     jsonrpc: rust_math_mcp::protocol::constants::JSON_RPC_VERSION.to_string(),
                     id: None, // Parse errors can have null ID per JSON-RPC 2.0
@@ -77,7 +80,7 @@ fn main() -> McpResult<()> {
                         "isError": true
                     })),
                     error: None, // Don't use error field - Claude Desktop doesn't recognize it
-                }) {
+                }, false) { // Use raw JSON format for parse errors (Claude Desktop format)
                     Ok(_) => {
                         // Response sent successfully
                     }

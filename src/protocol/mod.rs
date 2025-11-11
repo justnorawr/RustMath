@@ -1,6 +1,9 @@
 pub mod constants;
 pub mod parser;
 
+// Re-export parser types
+pub use parser::ParseResult;
+
 use crate::config::Config;
 use crate::error::{McpError, McpResult};
 use serde::{Deserialize, Serialize};
@@ -109,15 +112,16 @@ pub struct ToolCallParams {
 /// Send a JSON-RPC response to stdout.
 ///
 /// Formats the response according to MCP protocol:
-/// - Content-Length header
-/// - Blank line
+/// - Content-Length header (if use_content_length is true)
+/// - Blank line (if use_content_length is true)
 /// - JSON message
 ///
 /// # Arguments
 ///
 /// * `response` - The JSON-RPC response to send
+/// * `use_content_length` - If true, use Content-Length header format; if false, send raw JSON
 #[instrument(skip(response))]
-pub fn send_response(response: JsonRpcResponse) -> McpResult<()> {
+pub fn send_response(response: JsonRpcResponse, use_content_length: bool) -> McpResult<()> {
     // Validate response format for Claude Desktop compatibility
     // Claude Desktop requires id to be non-null for request responses
     // (null is only acceptable for parse errors per JSON-RPC 2.0 spec)
@@ -131,17 +135,20 @@ pub fn send_response(response: JsonRpcResponse) -> McpResult<()> {
     let content_length = json.len();
     
     // Log to stderr only (tracing is configured to use stderr)
-    debug!("Sending response: {} bytes, id={:?}", content_length, response.id);
+    debug!("Sending response: {} bytes, id={:?}, format={}", content_length, response.id, if use_content_length { "Content-Length" } else { "raw JSON" });
     // Only log full JSON in trace level to avoid stderr spam
     trace!("Response JSON: {}", json);
     
-    // MCP protocol format: Content-Length header, blank line, then JSON
-    // Use write! with exact byte control to ensure proper format
-    // Format: "Content-Length: <number>\r\n\r\n<json>"
-    let header = format!("Content-Length: {}\r\n\r\n", content_length);
     let mut stdout = io::stdout();
-    stdout.write_all(header.as_bytes())
-        .map_err(|e| McpError::internal_error(format!("Failed to write header: {}", e)))?;
+    
+    if use_content_length {
+        // MCP stdio format: Content-Length header, blank line, then JSON
+        // Format: "Content-Length: <number>\r\n\r\n<json>"
+        let header = format!("Content-Length: {}\r\n\r\n", content_length);
+        stdout.write_all(header.as_bytes())
+            .map_err(|e| McpError::internal_error(format!("Failed to write header: {}", e)))?;
+    }
+    // Write JSON (with or without header)
     stdout.write_all(json.as_bytes())
         .map_err(|e| McpError::internal_error(format!("Failed to write JSON: {}", e)))?;
     stdout.flush()

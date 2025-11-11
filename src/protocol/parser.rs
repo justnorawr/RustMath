@@ -7,6 +7,13 @@ use tracing::debug;
 /// Set to 10MB - enough for large tool calls but prevents DoS.
 const MAX_CONTENT_LENGTH: usize = 10_000_000;
 
+/// Parse result containing both the request and the format used
+#[derive(Debug)]
+pub struct ParseResult {
+    pub request: JsonRpcRequest,
+    pub uses_content_length: bool,
+}
+
 /// Parse MCP protocol message from a buffered reader.
 ///
 /// Supports two formats:
@@ -23,7 +30,7 @@ const MAX_CONTENT_LENGTH: usize = 10_000_000;
 ///
 /// # Returns
 ///
-/// A parsed and validated JSON-RPC request, or an error if parsing fails.
+/// A parsed result containing the request and whether Content-Length format was used
 ///
 /// # Errors
 ///
@@ -32,7 +39,7 @@ const MAX_CONTENT_LENGTH: usize = 10_000_000;
 /// - Content-Length header is invalid (for format 1)
 /// - JSON message cannot be parsed
 /// - JSON-RPC version is invalid
-pub fn parse_message<R: BufRead>(reader: &mut R) -> McpResult<JsonRpcRequest> {
+pub fn parse_message<R: BufRead>(reader: &mut R) -> McpResult<ParseResult> {
     // Try to read the first line to determine the format
     let mut first_line = String::new();
     let bytes_read = reader.read_line(&mut first_line)
@@ -79,7 +86,10 @@ pub fn parse_message<R: BufRead>(reader: &mut R) -> McpResult<JsonRpcRequest> {
         // Parse JSON-RPC request
         let request: JsonRpcRequest = serde_json::from_str(&json_str)?;
         request.validate()?;
-        Ok(request)
+        Ok(ParseResult {
+            request,
+            uses_content_length: true,
+        })
     } else if trimmed.starts_with('{') {
         // It's raw JSON (Claude Desktop format) - read the entire JSON object
         // We need to read until we have a complete JSON object
@@ -91,7 +101,10 @@ pub fn parse_message<R: BufRead>(reader: &mut R) -> McpResult<JsonRpcRequest> {
             match serde_json::from_str::<JsonRpcRequest>(&json_buffer.trim()) {
                 Ok(request) => {
                     request.validate()?;
-                    return Ok(request);
+                    return Ok(ParseResult {
+                        request,
+                        uses_content_length: false,
+                    });
                 }
                 Err(e) if e.is_eof() || e.is_data() => {
                     // Need more data - read another line
