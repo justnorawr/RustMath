@@ -67,7 +67,7 @@ fn main() -> McpResult<()> {
                 let error_msg = e.message.clone();
                 if error_code == -32001 && error_msg.contains("EOF") {
                     debug!("Received EOF, shutting down gracefully");
-                    break; // Exit the loop cleanly
+                    return Ok(()); // Exit cleanly
                 }
                 
                 error!("Error parsing message: {}", e);
