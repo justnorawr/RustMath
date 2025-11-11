@@ -62,7 +62,10 @@ fn main() -> McpResult<()> {
             }
             Err(e) => {
                 // Handle EOF gracefully - this is a clean shutdown, not an error
-                if e.code == -32001 && e.message.contains("EOF") {
+                // Check error code and message to detect EOF
+                let error_code = e.code;
+                let error_msg = e.message.clone();
+                if error_code == -32001 && error_msg.contains("EOF") {
                     debug!("Received EOF, shutting down gracefully");
                     break; // Exit the loop cleanly
                 }
