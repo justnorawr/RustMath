@@ -55,7 +55,8 @@ pub fn parse_message<R: BufRead>(reader: &mut R) -> McpResult<JsonRpcRequest> {
         )));
     }
 
-    let length: usize = content_length_line
+    // Use trimmed line for parsing to avoid issues with trailing whitespace
+    let length: usize = trimmed
         .split_whitespace()
         .nth(1)
         .ok_or_else(|| McpError::invalid_request("Invalid Content-Length header format"))?
