@@ -61,6 +61,12 @@ fn main() -> McpResult<()> {
                 send_response(response, parse_result.uses_content_length)?;
             }
             Err(e) => {
+                // Handle EOF gracefully - this is a clean shutdown, not an error
+                if e.code == -32001 && e.message.contains("EOF") {
+                    debug!("Received EOF, shutting down gracefully");
+                    break; // Exit the loop cleanly
+                }
+                
                 error!("Error parsing message: {}", e);
                 // For parse errors, JSON-RPC 2.0 spec says we can send a response with null ID
                 // However, if the parse completely fails, we might not be able to send a proper response
