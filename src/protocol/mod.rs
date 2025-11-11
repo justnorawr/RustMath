@@ -17,7 +17,7 @@ pub use constants::*;
 /// JSON-RPC 2.0 request structure.
 ///
 /// Represents an incoming request from an MCP client.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct JsonRpcRequest {
     pub jsonrpc: String,
     pub id: Option<Value>,

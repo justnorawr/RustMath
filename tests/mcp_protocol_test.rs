@@ -1,10 +1,10 @@
-use rust_math_mcp::protocol::{JsonRpcResponse, JsonRpcRequest};
+use rust_math_mcp::protocol::{JsonRpcRequest, JsonRpcResponse};
 use serde_json::{json, Value};
 
 #[test]
 fn test_response_id_serialization() {
     // Test that response with id=0 serializes correctly (not as null)
-    let response = JsonRpcResponse {
+    let response = rust_math_mcp::protocol::JsonRpcResponse {
         jsonrpc: "2.0".to_string(),
         id: Some(Value::Number(0.into())),
         result: Some(json!({"test": "value"})),
@@ -23,7 +23,7 @@ fn test_response_id_serialization() {
 #[test]
 fn test_response_id_string_serialization() {
     // Test that response with string id serializes correctly
-    let response = JsonRpcResponse {
+    let response = rust_math_mcp::protocol::JsonRpcResponse {
         jsonrpc: "2.0".to_string(),
         id: Some(Value::String("test-id".to_string())),
         result: Some(json!({"test": "value"})),
@@ -42,7 +42,7 @@ fn test_response_id_string_serialization() {
 #[test]
 fn test_response_with_result_content() {
     // Test MCP tools/call response format
-    let response = JsonRpcResponse {
+    let response = rust_math_mcp::protocol::JsonRpcResponse {
         jsonrpc: "2.0".to_string(),
         id: Some(Value::Number(1.into())),
         result: Some(json!({
@@ -86,7 +86,7 @@ fn test_response_matches_request_id() {
     let request_id = request.id.clone();
     
     // Simulate creating a response with the request ID
-    let response = JsonRpcResponse {
+    let response = rust_math_mcp::protocol::JsonRpcResponse {
         jsonrpc: "2.0".to_string(),
         id: request_id,
         result: Some(json!({"protocolVersion": "2025-06-18"})),
@@ -104,7 +104,7 @@ fn test_response_matches_request_id() {
 #[test]
 fn test_error_response_format() {
     // Test error response format (using result instead of error field)
-    let response = JsonRpcResponse {
+    let response = rust_math_mcp::protocol::JsonRpcResponse {
         jsonrpc: "2.0".to_string(),
         id: Some(Value::Number(1.into())),
         result: Some(json!({
