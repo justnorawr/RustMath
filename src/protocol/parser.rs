@@ -22,7 +22,7 @@ pub struct ParseResult {
 ///    - Line 2: Empty line
 ///    - Line 3+: JSON message of <number> bytes
 /// 2. Raw JSON format (Claude Desktop):
-///    - Direct JSON object (may span multiple lines)
+///    - Direct JSON object (may span multiple lines, may or may not have trailing newline)
 ///
 /// # Arguments
 ///
@@ -40,20 +40,27 @@ pub struct ParseResult {
 /// - JSON message cannot be parsed
 /// - JSON-RPC version is invalid
 pub fn parse_message<R: BufRead>(reader: &mut R) -> McpResult<ParseResult> {
-    // Try to read the first line to determine the format
-    let mut first_line = String::new();
-    let bytes_read = reader.read_line(&mut first_line)
+    // Try to peek at the first bytes to determine the format
+    // This avoids blocking on read_line if there's no newline
+    let buffer = reader.fill_buf()
         .map_err(|e| McpError::internal_error(format!("Failed to read input: {}", e)))?;
-
+    
     // Handle EOF gracefully (clean shutdown)
-    if bytes_read == 0 {
+    if buffer.is_empty() {
         return Err(McpError::new(-32001, "EOF: clean shutdown"));
     }
-
-    let trimmed = first_line.trim();
     
-    // Check if it's a Content-Length header (MCP stdio format)
-    if trimmed.starts_with("Content-Length:") {
+    // Check if it starts with '{' (raw JSON) or "Content-Length:" (MCP stdio format)
+    let starts_with_json = buffer.first().map(|&b| b == b'{').unwrap_or(false);
+    let starts_with_header = buffer.starts_with(b"Content-Length:");
+    
+    if starts_with_header {
+        // MCP stdio format with Content-Length header
+        let mut first_line = String::new();
+        reader.read_line(&mut first_line)
+            .map_err(|e| McpError::internal_error(format!("Failed to read header: {}", e)))?;
+        
+        let trimmed = first_line.trim();
         // Parse Content-Length header format
         let length: usize = trimmed
             .split_whitespace()
@@ -90,15 +97,27 @@ pub fn parse_message<R: BufRead>(reader: &mut R) -> McpResult<ParseResult> {
             request,
             uses_content_length: true,
         })
-    } else if trimmed.starts_with('{') {
+    } else if starts_with_json {
         // It's raw JSON (Claude Desktop format) - read the entire JSON object
-        // We need to read until we have a complete JSON object
-        let mut json_buffer = first_line;
+        // Read all available data and try to parse it
+        // We'll read in chunks until we have a complete JSON object
+        let mut json_buffer = Vec::new();
         
-        // Try to parse what we have so far
-        // If it's incomplete, we need to read more
+        // Read all available data first
         loop {
-            match serde_json::from_str::<JsonRpcRequest>(&json_buffer.trim()) {
+            let buffer = reader.fill_buf()
+                .map_err(|e| McpError::internal_error(format!("Failed to read JSON: {}", e)))?;
+            
+            if buffer.is_empty() {
+                break;
+            }
+            
+            let consumed = buffer.len();
+            json_buffer.extend_from_slice(buffer);
+            reader.consume(consumed);
+            
+            // Try to parse what we have so far
+            match serde_json::from_slice::<JsonRpcRequest>(&json_buffer) {
                 Ok(request) => {
                     request.validate()?;
                     return Ok(ParseResult {
@@ -107,22 +126,46 @@ pub fn parse_message<R: BufRead>(reader: &mut R) -> McpResult<ParseResult> {
                     });
                 }
                 Err(e) if e.is_eof() || e.is_data() => {
-                    // Need more data - read another line
-                    let mut next_line = String::new();
-                    let bytes = reader.read_line(&mut next_line)
-                        .map_err(|e| McpError::internal_error(format!("Failed to read JSON: {}", e)))?;
-                    if bytes == 0 {
-                        return Err(McpError::parse_error("Incomplete JSON message"));
-                    }
-                    json_buffer.push_str(&next_line);
+                    // Need more data - continue reading
+                    continue;
                 }
                 Err(e) => {
-                    return Err(McpError::parse_error(format!("JSON parse error: {}", e)));
+                    // Try parsing as string in case there's trailing whitespace
+                    match String::from_utf8(json_buffer.clone())
+                        .ok()
+                        .and_then(|s| serde_json::from_str::<JsonRpcRequest>(s.trim()).ok())
+                    {
+                        Some(request) => {
+                            request.validate()?;
+                            return Ok(ParseResult {
+                                request,
+                                uses_content_length: false,
+                            });
+                        }
+                        None => {
+                            return Err(McpError::parse_error(format!("JSON parse error: {}", e)));
+                        }
+                    }
                 }
             }
         }
+        
+        // If we get here, we didn't get a complete JSON object in the buffer
+        // Try parsing what we have as a string (might have trailing newline/whitespace)
+        let json_str = String::from_utf8(json_buffer)
+            .map_err(|e| McpError::parse_error(format!("Invalid UTF-8 in message: {}", e)))?;
+        let request: JsonRpcRequest = serde_json::from_str(json_str.trim())?;
+        request.validate()?;
+        Ok(ParseResult {
+            request,
+            uses_content_length: false,
+        })
     } else {
-        // Unknown format
+        // Unknown format - try to read a line to see what we got
+        let mut first_line = String::new();
+        reader.read_line(&mut first_line)
+            .map_err(|e| McpError::internal_error(format!("Failed to read input: {}", e)))?;
+        let trimmed = first_line.trim();
         debug!("Unknown input format, first line: {:?}", trimmed);
         return Err(McpError::invalid_request(format!(
             "Unknown message format, expected Content-Length header or JSON, got: {}",
@@ -130,4 +173,3 @@ pub fn parse_message<R: BufRead>(reader: &mut R) -> McpResult<ParseResult> {
         )));
     }
 }
-
