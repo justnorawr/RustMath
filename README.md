@@ -308,12 +308,38 @@ Check the logs for detailed error messages:
 - Ask Claude "What tools do you have?" to trigger tool discovery
 - Check the logs for initialization errors
 
+**Persistent error dialogs after fixes**:
+- Claude Desktop caches error states in session storage
+- Use the provided script to clear cache: `./scripts/clear_claude_cache.sh`
+- This clears all cache and session data while preserving your configuration
+- After clearing, restart Claude Desktop for a fresh start
+
 ### Security Features
 
 - **Memory Protection**: Content-Length capped at 10MB to prevent memory exhaustion attacks
 - **Overflow Protection**: Checked arithmetic on all combinatorial operations (factorial, permutation, combination)
 - **Input Sanitization**: Error messages sanitized to prevent log injection
 - **Resilience**: Mutex poison recovery ensures cascading failures don't occur
+
+## Utility Scripts
+
+The `scripts/` directory contains helpful utilities:
+
+### Clear Claude Desktop Cache
+
+If you encounter persistent error dialogs after fixes:
+
+```bash
+./scripts/clear_claude_cache.sh
+```
+
+This script:
+- Clears Claude Desktop's cache and session storage (macOS only)
+- Removes cached error states
+- Preserves your configuration file
+- Provides a fresh start after server updates
+
+**Note:** Make sure Claude Desktop is fully quit before running.
 
 ## Development
 
@@ -351,10 +377,18 @@ src/
 │   ├── registry.rs     # HashMap-based tool registry
 │   ├── traits.rs       # ToolRegistry trait
 │   └── [category].rs   # Tool modules by category
-└── lib/                 # Shared utilities
+└── utils/               # Shared utilities
     ├── args.rs         # Argument parsing
     ├── validation.rs   # Input validation
-    └── limits.rs        # Resource limits
+    ├── limits.rs       # Resource limits
+    └── rate_limiter.rs # Rate limiting
+scripts/
+└── clear_claude_cache.sh  # Clear Claude Desktop cache (macOS)
+tests/
+├── claude_desktop_integration_test.rs  # Claude Desktop integration tests
+├── integration_test.rs                 # General integration tests
+├── mcp_protocol_test.rs               # Protocol compliance tests
+└── property_test.rs                   # Property-based tests
 ```
 
 ## License
