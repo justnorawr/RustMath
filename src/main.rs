@@ -11,7 +11,10 @@ use std::sync::Arc;
 use tracing::{error, info};
 
 fn main() -> McpResult<()> {
+    // Configure tracing to write to stderr to avoid polluting stdout (MCP protocol)
     tracing_subscriber::fmt()
+        .with_writer(std::io::stderr)
+        .with_ansi(false) // Disable ANSI codes for compatibility
         .with_env_filter(
             std::env::var("RUST_LOG")
                 .unwrap_or_else(|_| "rust_math_mcp=info".to_string())
@@ -46,7 +49,8 @@ fn main() -> McpResult<()> {
             }
             Err(e) => {
                 error!("Error parsing message: {}", e);
-                // Send error response if we have a request ID
+                // Note: We can't get request ID from a failed parse, so id remains None
+                // This is acceptable per JSON-RPC spec for parse errors
                 let error_response = rust_math_mcp::protocol::JsonRpcResponse {
                     jsonrpc: rust_math_mcp::protocol::constants::JSON_RPC_VERSION.to_string(),
                     id: None,
