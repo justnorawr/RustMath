@@ -312,9 +312,22 @@ pub fn handle_method_with_config<T: crate::tools::ToolRegistry>(
                 }
             }
         }
+        "notifications/initialized" => {
+            // Standard MCP notification sent by client after initialization
+            // Notifications don't require a response, but we need to return something
+            // Return success with empty result
+            debug!("Received initialized notification");
+            Ok(JsonRpcResponse {
+                jsonrpc: constants::JSON_RPC_VERSION.to_string(),
+                id: id.clone(),
+                result: Some(serde_json::json!({})),
+                error: None,
+            })
+        }
         _ => {
-            error!(method = %method, "Method not found");
-            debug!("Method not found, id: {:?}", id);
+            // Log as debug instead of error for unknown methods (might be optional notifications)
+            debug!(method = %method, "Unknown method");
+            debug!("Unknown method, id: {:?}", id);
             // MCP requires result to always be present, even for errors
             Ok(JsonRpcResponse {
                 jsonrpc: constants::JSON_RPC_VERSION.to_string(),
