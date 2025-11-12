@@ -1,11 +1,12 @@
 use rmcp::{
     ServerHandler,
-    model::{CallToolResult, CallToolRequestParam, ErrorData, ErrorCode, Implementation, ListToolsResult, PaginatedRequestParam, ProtocolVersion, ServerCapabilities, ServerInfo, Tool},
+    model::{CallToolResult, CallToolRequestParam, ErrorCode, ErrorData, Implementation, ListToolsResult, PaginatedRequestParam, ProtocolVersion, ServerCapabilities, ServerInfo, Tool},
     service::{RequestContext, RoleServer},
 };
 use std::borrow::Cow;
 
-/// MathService bridges the custom implementation with rmcp
+/// MathService implements the ServerHandler for rmcp
+/// This bridges the existing tool implementations with the rmcp SDK
 #[derive(Clone, Default)]
 pub struct MathService;
 
@@ -14,31 +15,31 @@ impl MathService {
         Self::default()
     }
 
-    /// Get list of available tools
+    /// Build tool list from existing implementations
     pub fn _list_tools(&self) -> Vec<Tool> {
-        // Build tool list from existing registry
-        // For now, return empty - we'll populate from custom code
+        // TODO: Wire up existing tool definitions from src/tools/
+        // For now, returning empty to let compilation succeed
         vec![]
     }
 
-    /// Call a tool
+    /// Execute a tool by name
     pub async fn _call_tool(
         &self,
         tool_name: &str,
         tool_input: Option<serde_json::Map<String, serde_json::Value>>,
     ) -> Result<CallToolResult, ErrorData> {
-        // Bridge to existing tool execution system
-        // This is temporary while we migrate to rmcp macros
-        let _ = tool_input; // Silence unused warning for now
+        // TODO: Wire up existing tool execution from src/tools/
+        // This bridges to the custom tool implementations
+        let _ = tool_input;
         Err(ErrorData {
             code: ErrorCode(-32601),
-            message: Cow::Owned(format!("Tool not found: {}", tool_name)),
+            message: Cow::Owned(format!("Tool not implemented: {}", tool_name)),
             data: None,
         })
     }
 }
 
-/// Implement ServerHandler for rmcp
+/// Implement ServerHandler for rmcp integration
 impl ServerHandler for MathService {
     fn get_info(&self) -> ServerInfo {
         ServerInfo {
